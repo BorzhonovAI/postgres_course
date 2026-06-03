@@ -2,3 +2,4 @@
 /pg-course-template/.idea/
 pg-course-template/src/__pycache__/
 pg-course-template/src/handlers/__pycache__/
+postgresql_data/
