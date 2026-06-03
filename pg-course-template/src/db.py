@@ -4,8 +4,11 @@ import psycopg
 from psycopg import Connection
 
 DB_NAME: Final[str] = "inventorydb"
+# DB_NAME: Final[str] = "postgres"
 DB_USER: Final[str] = "app_user"
-DB_PASSWORD: Final[str] = "pass"
+# DB_USER: Final[str] = "postgres"
+DB_PASSWORD: Final[str] = "gfhjkm"
+# DB_PASSWORD: Final[str] = "1234567890"
 DB_HOST: Final[str] = "127.0.0.1"
 DB_PORT: Final[int] = 5432
 
