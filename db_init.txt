@@ -1,7 +1,12 @@
 CREATE DATABASE inventorydb;
 CREATE ROLE app_user WITH LOGIN PASSWORD 'gfhjkm';
-CREATE SCHEMA catalog AUTHORIZATION app_user;
 GRANT CREATE ON DATABASE inventorydb TO app_user;
+
+
+# Дальнейшие команды должны выполнятся от имени app_user
+
+
+CREATE SCHEMA catalog AUTHORIZATION app_user;
 GRANT CREATE ON SCHEMA catalog TO app_user;
 set search_path to catalog;
 create table catalog.product_categories (
