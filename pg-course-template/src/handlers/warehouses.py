@@ -35,6 +35,7 @@ city_validator = ChoiceValidator(
 )
 
 
+# TODO add is_central
 @dataclass
 class Warehouse:
     id: int
@@ -139,7 +140,7 @@ def edit_warehouse(_id: str) -> None:
         "Адрес: ", default=warehouse.address, validator=NonEmptyValidator()
     ).strip()
     label = (
-        prompt("Метка (необязательно): ", default=warehouse.label or "").strip() or None
+            prompt("Метка (необязательно): ", default=warehouse.label or "").strip() or None
     )
     conn.execute(
         """UPDATE catalog.warehouses SET city = %s, address = %s, label = %s
