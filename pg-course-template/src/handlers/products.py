@@ -8,7 +8,8 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
-from validators import NonEmptyValidator, YesNoValidator
+from product_categories import ProductCategory
+from validators import NonEmptyValidator, YesNoValidator, PriceValidator, ProductCategoryValidator
 from commands import command, CATEGORY_PRODUCTS
 
 
@@ -18,7 +19,16 @@ class Product:
     sku: str
     name: str
     price: Decimal
-    category: str
+    category_id: int
+
+
+def get_category_name_by_id(_id: int) -> str | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories WHERE id = %s", (_id,))
+        category: ProductCategory | None = cur.fetchone()
+
+    return category.name
 
 
 def _render_product(product: Product):  # pylint: disable=unused-argument
@@ -31,7 +41,7 @@ def _render_product(product: Product):  # pylint: disable=unused-argument
     table.add_row("SKU", product.sku)
     table.add_row("Имя", product.name)
     table.add_row("Цена", str(product.price))
-    table.add_row("Категория", product.category)
+    table.add_row("Категория", get_category_name_by_id(product.category_id))
 
     panel = Panel(
         table,
@@ -64,7 +74,7 @@ def list_products() -> None:
             product.sku,
             product.name,
             str(product.price),
-            product.category,
+            get_category_name_by_id(product.category_id),
         )
     console.print(table)
 
