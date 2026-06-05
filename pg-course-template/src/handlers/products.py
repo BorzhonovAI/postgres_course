@@ -62,7 +62,7 @@ def list_products() -> None:
     table.add_column("SKU", style="green", min_width=20)
     table.add_column("Имя", style="yellow", min_width=30)
     table.add_column("Цена", style="magenta", min_width=15)
-    table.add_column("Категория", style="orange", min_width=15)
+    table.add_column("Категория", style="red", min_width=15)
 
     with conn.cursor(row_factory=class_row(Product)) as cur:
         cur.execute("SELECT * FROM catalog.products")
