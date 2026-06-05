@@ -1,7 +1,10 @@
+from prompt_toolkit import prompt
 from rich.panel import Panel
 
+from validators import YesNoValidator
 from console import console
 from commands import get_commands, CATEGORIES, command, CATEGORY_GENERAL, Command
+from db import get_conn
 
 
 @command("help", "эта справка", CATEGORY_GENERAL)
@@ -42,7 +45,21 @@ def clear_screen() -> None:
     console.clear()
 
 
-# TODO add clear all
+@command("delete all", "удалить все склады, товары и категории товаров", CATEGORY_GENERAL)
+def delete_all_product_categories() -> None:
+    conn = get_conn()
+
+    answer = (prompt
+        (
+        f"Вы собираетесь удалить все склады, товары и категории товаров. Вы уверены? (y/n, д/н): ",
+        validator=YesNoValidator()
+    ))
+
+    if YesNoValidator.is_yes(answer):
+        conn.execute("TRUNCATE TABLE catalog.warehouses")
+        conn.execute("TRUNCATE TABLE catalog.products")
+        conn.execute("TRUNCATE TABLE catalog.product_categories")
+        console.print(f"[green]Все склады, товары и категории товаров удалены [/green]")
 
 
 @command("exit", "выход", CATEGORY_GENERAL)
