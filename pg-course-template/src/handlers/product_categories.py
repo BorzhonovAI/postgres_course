@@ -107,7 +107,10 @@ def edit_category(_id: str) -> None:
 
 @command("delete product_category", "удалить категорию товара", CATEGORY_PRODUCTS_CATEGORIES)
 def delete_category(_id: str) -> None:
+    from products import products_count_by_category_id
+
     conn = get_conn()
+
     with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
         cur.execute("SELECT * FROM catalog.product_categories WHERE id = %s", (_id,))
         category: ProductCategory | None = cur.fetchone()
@@ -118,8 +121,43 @@ def delete_category(_id: str) -> None:
 
     _render_product_category(category)
 
+    p_count = products_count_by_category_id(category.id)
+    console.log(f"[red bold]Предупреждение:[/bold red]: При удалении категории будет удалено "
+                f"{p_count} товаров этой категории")
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
         conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
+        conn.execute("DELETE FROM catalog.products WHERE category_id = %s", (_id,))
         console.print(f"[green]Категория товара удалена [/green]")
+
+
+def product_categories_count() -> int:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    return len(product_categories)
+
+
+@command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
+def delete_all_product_categories() -> None:
+    from products import delete_all_products
+
+    conn = get_conn()
+
+    count = product_categories_count()
+
+    console.log(f"[red bold]Предупреждение:[/bold red]: При удалении всех "
+                f"категорий товаров будут удалены так же и все товары")
+    answer = (prompt
+        (
+        f"Вы собираетесь удалить {count} категорий товаров. Вы уверены? (y/n, д/н): ",
+        validator=YesNoValidator()
+    ))
+
+    if YesNoValidator.is_yes(answer):
+        conn.execute("TRUNCATE TABLE catalog.products")
+        conn.execute("TRUNCATE TABLE catalog.product_categories")
+        console.print(f"[green]Все категории товаров удалены [/green]")
