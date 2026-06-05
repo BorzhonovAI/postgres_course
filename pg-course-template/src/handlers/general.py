@@ -46,7 +46,7 @@ def clear_screen() -> None:
 
 
 @command("delete all", "удалить все склады, товары и категории товаров", CATEGORY_GENERAL)
-def delete_all_product_categories() -> None:
+def delete_all() -> None:
     conn = get_conn()
 
     answer = (prompt
