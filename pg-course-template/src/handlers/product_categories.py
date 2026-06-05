@@ -141,10 +141,21 @@ def product_categories_count() -> int:
     return len(product_categories)
 
 
+def get_product_categories_names() -> list[str]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    names_list: list[str] = []
+    for category in product_categories:
+        names_list.append(category.name)
+
+    return names_list
+
+
 @command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
 def delete_all_product_categories() -> None:
-    from products import delete_all_products
-
     conn = get_conn()
 
     count = product_categories_count()
