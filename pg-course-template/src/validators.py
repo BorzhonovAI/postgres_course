@@ -17,6 +17,8 @@ class PriceValidator(Validator):
                 raise ValidationError(
                     message="Введите число", cursor_position=len(text)
                 ) from e
+        else:
+            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
 
 
 class NonEmptyValidator(Validator):
