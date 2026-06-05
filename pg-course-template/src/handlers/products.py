@@ -123,7 +123,12 @@ def add_product() -> None:
         "INSERT INTO catalog.products (sku, name, price, category_id) VALUES (%s,%s,%s,%s)",
         (sku, name, price, category.id),
     )
-    console.print(f"[green]Товар {name} добавлен [/green]")
+
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE sku = %s", (sku,))
+        product: Product | None = cur.fetchone()
+
+    console.print(f"[green]Товар {name} ({product.id}) добавлен [/green]")
 
 
 @command("edit product", "редактировать товар", CATEGORY_PRODUCTS)
