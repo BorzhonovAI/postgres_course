@@ -1,6 +1,29 @@
 from typing import Final
 
 from prompt_toolkit.validation import Validator, ValidationError
+from psycopg.rows import class_row
+
+from db import get_conn
+
+
+class ProductCategoryValidator(Validator):
+    def validate(self, document):
+        from product_categories import ProductCategory
+        text = document.text.strip()
+        if text:
+            conn = get_conn()
+            with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+                cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (text,))
+                category: ProductCategory | None = cur.fetchone()
+
+            if category is None:
+                raise ValidationError(
+                    message=f"Категория товара с именем {text} не найдена, список всех "
+                            f"категорий товаров можно получить командой list product_categories",
+                    cursor_position=len(text)
+                )
+        else:
+            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
 
 
 class PriceValidator(Validator):
