@@ -220,3 +220,20 @@ def delete_warehouse(_id: str) -> None:
             )
         else:
             console.print(f"[green]Склад в городе {warehouse.city} удален [/green]")
+
+
+@command("delete all warehouses", "удалить все категории товаров", CATEGORY_WAREHOUSES)
+def delete_all_product_categories() -> None:
+    conn = get_conn()
+
+    count = warehouses_count()
+
+    answer = (prompt
+        (
+        f"Вы собираетесь удалить {count} складов. Вы уверены? (y/n, д/н): ",
+        validator=YesNoValidator()
+    ))
+
+    if YesNoValidator.is_yes(answer):
+        conn.execute("TRUNCATE TABLE catalog.warehouses")
+        console.print(f"[green]Все склады удалены [/green]")
