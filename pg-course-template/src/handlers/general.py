@@ -42,6 +42,12 @@ def clear_screen() -> None:
     console.clear()
 
 
+# TODO add clear all
+# TODO add clear warehouses
+# TODO add clear products
+# TODO add clear product categories
+
+
 @command("exit", "выход", CATEGORY_GENERAL)
 def exit_app() -> None:
     """Выход - ничего не делает, обрабатывается в main loop"""
