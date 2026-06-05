@@ -62,13 +62,21 @@ def get_commands() -> Sequence[Command]:
 def _build_completer_dict() -> dict:
     result: dict = {}
     for cmd in get_commands():
+        if not cmd.text or not cmd.text.strip():
+            continue
         words = cmd.text.split()
         current = result
         for word in words[:-1]:
+            # Важно: если там уже есть — проверяем тип
             if word not in current:
                 current[word] = {}
+            elif not isinstance(current[word], dict):
+                # Если там был None или строка — заменяем на {}
+                current[word] = {}
             current = current[word]
-        current[words[-1]] = None
+        # На последнем слове просто ставим None
+        if isinstance(current, dict):
+            current[words[-1]] = None
     return result
 
 
@@ -100,7 +108,7 @@ def get_args(user_input: str, cmd: Command) -> dict[str, str]:
         raise ValueError(f"Input is not aligned with {cmd.text}")
     command_parts = cmd.text.split()
     input_parts = user_input.split()
-    args = input_parts[len(command_parts) :]
+    args = input_parts[len(command_parts):]
     if len(args) != len(cmd.args):
         raise ValueError(f"Command {cmd.text} expects {len(cmd.args)} argument(s)")
     return dict(zip(cmd.args, args))
