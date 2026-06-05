@@ -44,8 +44,6 @@ def clear_screen() -> None:
 
 # TODO add clear all
 # TODO add clear warehouses
-# TODO add clear products
-# TODO add clear product categories
 
 
 @command("exit", "выход", CATEGORY_GENERAL)

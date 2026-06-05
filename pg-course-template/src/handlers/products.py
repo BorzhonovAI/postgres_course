@@ -175,3 +175,37 @@ def delete_product(_id: str) -> None:
         conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
+
+
+def products_count() -> int:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products")
+        products: list[Product] = cur.fetchall()
+
+    return len(products)
+
+
+def products_count_by_category_id(_id: int) -> int:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE category_id = %s", (_id,))
+        products: list[Product] = cur.fetchall()
+
+    return len(products)
+
+
+@command("delete all products", "удалить все товары", CATEGORY_PRODUCTS)
+def delete_all_products() -> None:
+    conn = get_conn()
+
+    count = products_count()
+    answer = (prompt
+        (
+        f"Вы собираетесь удалить {count} товаров. Вы уверены? (y/n, д/н): ",
+        validator=YesNoValidator()
+    ))
+
+    if YesNoValidator.is_yes(answer):
+        conn.execute("TRUNCATE TABLE catalog.products")
+        console.print(f"[green]Все товары удалены [/green]")
