@@ -223,7 +223,7 @@ def delete_warehouse(_id: str) -> None:
 
 
 @command("delete all warehouses", "удалить все категории товаров", CATEGORY_WAREHOUSES)
-def delete_all_product_categories() -> None:
+def delete_all_warehouses() -> None:
     conn = get_conn()
 
     count = warehouses_count()
