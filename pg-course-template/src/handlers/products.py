@@ -93,28 +93,85 @@ def show_product(_id: str) -> None:
     _render_product(product)
 
 
+def get_category_by_name(category_name: str) -> ProductCategory | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (category_name,))
+        category: ProductCategory | None = cur.fetchone()
+
+    return category
+
+
 @command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS)
 def add_product() -> None:
-    """
-    Добавляет новый продукт в базу данных.
-    Запрашивает у пользователя: SKU, название, цену и категорию.
-    Используйте prompt с валидаторами для ввода данных.
-    """
+    conn = get_conn()
+
+    sku = prompt("SKU: ", validator=NonEmptyValidator()).strip()
+    name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
+    price = prompt("Цена: ", validator=PriceValidator()).strip()
+    category_str = prompt("Категория: ", validator=ProductCategoryValidator()).strip()
+    category = get_category_by_name(category_str)
+
+    conn.execute(
+        "INSERT INTO catalog.products (sku, name, price, category_id) VALUES (%s,%s,%s,%s)",
+        (sku, name, price, category.id),
+    )
+    console.print(f"[green]Товар {name} добавлен [/green]")
 
 
 @command("edit product", "редактировать товар", CATEGORY_PRODUCTS)
 def edit_product(_id: str) -> None:
-    """
-    Редактирует существующий продукт.
-    Сначала проверяет существование продукта по ID.
-    Предлагает текущие значения как default при вводе новых данных.
-    """
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    if product is None:
+        render_error(f"Продукт с ID {_id} не найден")
+        return
+
+    sku = prompt(
+        "SKU: ", default=product.sku, validator=NonEmptyValidator()
+    ).strip()
+    name = prompt(
+        "Имя: ", default=product.name, validator=NonEmptyValidator()
+    ).strip()
+    price = prompt(
+        "Цена: ", default=str(product.price), validator=PriceValidator()
+    ).strip()
+    category_str = prompt(
+        "Категория: ",
+        default=get_category_name_by_id(product.category_id),
+        validator=ProductCategoryValidator()
+    ).strip()
+
+    category = get_category_by_name(category_str)
+
+    conn.execute(
+        """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category_id = %s
+        WHERE id = %s""",
+        (sku, name, price, category.id, _id),
+    )
+
+    console.print(f"[green]Продукт ({name}) обновлен [/green]")
 
 
 @command("delete product", "удалить товар", CATEGORY_PRODUCTS)
 def delete_product(_id: str) -> None:
-    """
-    Удаляет продукт из базы данных.
-    Сначала показывает информацию о продукте.
-    Запрашивает подтверждение перед удалением.
-    """
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    if product is None:
+        render_error(f"Склад с ID {_id} не найден")
+        return
+
+    _render_product(product)
+
+    answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
+
+    if YesNoValidator.is_yes(answer):
+        conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
+
+        console.print(f"[green]Продукт {product.name} удален [/green]")
