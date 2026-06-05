@@ -79,7 +79,12 @@ def add_category() -> None:
         "INSERT INTO catalog.product_categories (name) VALUES (%s)",
         (name,),  # fucking python
     )
-    console.print(f"[green]Категория {name} добавлена [/green]")
+
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (name,))
+        category: ProductCategory | None = cur.fetchone()
+
+    console.print(f"[green]Категория {name} ({category.id}) добавлена [/green]")
 
 
 @command("edit product_category", "редактировать категорию товара", CATEGORY_PRODUCTS_CATEGORIES)
