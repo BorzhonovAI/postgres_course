@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.shortcuts import choice
 from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
@@ -10,8 +10,8 @@ from rich.table import Table
 from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
-from product_categories import ProductCategory, get_product_categories_names
-from validators import NonEmptyValidator, YesNoValidator, PriceValidator, ChoiceValidator
+from product_categories import ProductCategory, get_product_categories
+from validators import NonEmptyValidator, YesNoValidator, PriceValidator
 
 
 @dataclass
@@ -107,21 +107,20 @@ def get_category_by_name(category_name: str) -> ProductCategory | None:
 def add_product() -> None:
     conn = get_conn()
 
-    category_completer = WordCompleter(get_product_categories_names(), ignore_case=True, sentence=True)
-    category_validator = ChoiceValidator(
-        get_product_categories_names(), message="Категория товара должна быть из списка. "
-                                                "Используйте Tab для автодополнения."
-    )
+    categories = get_product_categories()
+    categories_options = [(cat.id, cat.name) for cat in categories]
 
     sku = prompt("SKU: ", validator=NonEmptyValidator()).strip()
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
     price = prompt("Цена: ", validator=PriceValidator()).strip()
-    category_str = prompt("Категория: ", validator=category_validator, completer=category_completer).strip()
-    category = get_category_by_name(category_str)
+    category_id = choice(
+        message="Выберите категорию товара:",
+        options=categories_options
+    )
 
     conn.execute(
         "INSERT INTO catalog.products (sku, name, price, category_id) VALUES (%s,%s,%s,%s)",
-        (sku, name, price, category.id),
+        (sku, name, price, category_id),
     )
 
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -142,11 +141,8 @@ def edit_product(_id: str) -> None:
         render_error(f"Продукт с ID {_id} не найден")
         return
 
-    category_completer = WordCompleter(get_product_categories_names(), ignore_case=True, sentence=True)
-    category_validator = ChoiceValidator(
-        get_product_categories_names(), message="Категория товара должна быть из списка. "
-                                                "Используйте Tab для автодополнения."
-    )
+    categories = get_product_categories()
+    categories_options = [(cat.id, cat.name) for cat in categories]
 
     sku = prompt(
         "SKU: ", default=product.sku, validator=NonEmptyValidator()
@@ -157,18 +153,16 @@ def edit_product(_id: str) -> None:
     price = prompt(
         "Цена: ", default=str(product.price), validator=PriceValidator()
     ).strip()
-    category_str = prompt(
-        "Категория: ",
-        default=get_category_name_by_id(product.category_id),
-        validator=category_validator, completer=category_completer
-    ).strip()
-
-    category = get_category_by_name(category_str)
+    category_id = choice(
+        message="Выберите категорию товара:",
+        options=categories_options,
+        default=product.category_id,
+    )
 
     conn.execute(
         """UPDATE catalog.products SET sku = %s, name = %s, price = %s, category_id = %s
         WHERE id = %s""",
-        (sku, name, price, category.id, _id),
+        (sku, name, price, category_id, _id),
     )
 
     console.print(f"[green]Продукт ({name}) обновлен [/green]")

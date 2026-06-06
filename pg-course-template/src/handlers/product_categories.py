@@ -159,6 +159,15 @@ def get_product_categories_names() -> list[str]:
     return names_list
 
 
+def get_product_categories() -> list[ProductCategory]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    return product_categories
+
+
 @command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
 def delete_all_product_categories() -> None:
     conn = get_conn()
