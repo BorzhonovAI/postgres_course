@@ -127,7 +127,7 @@ def delete_category(_id: str) -> None:
     _render_product_category(category)
 
     p_count = products_count_by_category_id(category.id)
-    console.log(f"[red bold]Предупреждение:[/bold red]: При удалении категории будет удалено "
+    console.log(f"[yellow bold]Предупреждение:[/bold yellow]: При удалении категории будет удалено "
                 f"{p_count} товаров этой категории")
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
@@ -165,7 +165,7 @@ def delete_all_product_categories() -> None:
 
     count = product_categories_count()
 
-    console.log(f"[red bold]Предупреждение:[/bold red]: При удалении всех "
+    console.log(f"[yellow bold]Предупреждение:[/bold yellow]: При удалении всех "
                 f"категорий товаров будут удалены так же и все товары")
     answer = (prompt
         (

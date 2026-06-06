@@ -132,8 +132,8 @@ def add_warehouse() -> None:
             console.log("[yellow bold]Предупреждение:[/bold yellow]: Так как это первый склад - он будет центральным")
             is_central = True
     elif is_central:
-        answer = prompt("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад будет переназначен."
-                        " Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
+        console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад будет переназначен.")
+        answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
         if YesNoValidator.is_yes(answer):
             conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
         else:
@@ -178,7 +178,7 @@ def edit_warehouse(_id: str) -> None:
     ).strip())
 
     if is_central:
-        console.log("[red bold]Предупреждение:[/bold red]: Центральный склад переназначен")
+        console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен")
         conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
     elif warehouse.is_central:
         render_error(f"Если вы хотите изменить центральный склад, просто отредактируйте тот склад, "
