@@ -129,11 +129,15 @@ def add_warehouse() -> None:
 
     if warehouses_empty():
         if not is_central:
-            console.log("[red bold]Предупреждение:[/bold red]: Так как это первый склад - он будет центральным")
+            console.log("[yellow bold]Предупреждение:[/bold yellow]: Так как это первый склад - он будет центральным")
             is_central = True
     elif is_central:
-        console.log("[red bold]Предупреждение:[/bold red]: Центральный склад переназначен")
-        conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
+        answer = prompt("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад будет переназначен."
+                        " Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
+        if YesNoValidator.is_yes(answer):
+            conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
+        else:
+            return
 
     conn.execute(
         "INSERT INTO catalog.warehouses (city, address, label, is_central) VALUES (%s, %s, %s, %s)",
