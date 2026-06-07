@@ -125,19 +125,14 @@ def add_warehouse() -> None:
     city = prompt("Город: ", validator=city_validator, completer=city_completer).strip()
     address = prompt("Адрес: ", validator=NonEmptyValidator()).strip()
     label = prompt("Метка (необязательно): ").strip() or None
-    is_central = YesNoValidator.is_yes(prompt("Центральный: ", validator=YesNoValidator()).strip())
 
     if warehouses_empty():
-        if not is_central:
-            console.log("[yellow bold]Предупреждение:[/bold yellow]: Так как это первый склад - он будет центральным")
-            is_central = True
-    elif is_central:
-        console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад будет переназначен.")
-        answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
-        if YesNoValidator.is_yes(answer):
+        is_central = True
+    else:
+        is_central = YesNoValidator.is_yes(prompt("Центральный: ", validator=YesNoValidator()).strip())
+        if is_central:
+            console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен.")
             conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
-        else:
-            return
 
     conn.execute(
         "INSERT INTO catalog.warehouses (city, address, label, is_central) VALUES (%s, %s, %s, %s)",
@@ -173,17 +168,16 @@ def edit_warehouse(_id: str) -> None:
     label = (
             prompt("Метка (необязательно): ", default=warehouse.label or "").strip() or None
     )
-    is_central = YesNoValidator.is_yes(prompt(
-        "Центральный: ", default="да" if warehouse.is_central else "нет", validator=YesNoValidator()
-    ).strip())
+    if not warehouse.is_central:
+        is_central = YesNoValidator.is_yes(prompt(
+            "Центральный: ", default="нет", validator=YesNoValidator()
+        ).strip())
+    else:
+        is_central = False
 
     if is_central:
         console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен")
         conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
-    elif warehouse.is_central:
-        render_error(f"Если вы хотите изменить центральный склад, просто отредактируйте тот склад, "
-                     f"который вы хотите сделать центральным")
-        return
 
     conn.execute(
         """UPDATE catalog.warehouses SET city = %s, address = %s, label = %s, is_central = %s
