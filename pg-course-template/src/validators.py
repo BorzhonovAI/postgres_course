@@ -71,13 +71,15 @@ class YesNoValidator(Validator):
         text = document.text.lower()
         if text not in self.ALL_VALUES:
             raise ValidationError(message="Введите y/n (yes/no)")
+        elif not text:
+            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
 
 
 class ChoiceValidator(Validator):
     def __init__(
-        self,
-        choices: list[str],
-        message: str = "Значение должно быть из списка. Используйте Tab для автодополнения.",
+            self,
+            choices: list[str],
+            message: str = "Значение должно быть из списка. Используйте Tab для автодополнения.",
     ):
         self.choices = choices
         self.message = message
@@ -86,3 +88,5 @@ class ChoiceValidator(Validator):
         text = document.text.strip()
         if text and text not in self.choices:
             raise ValidationError(message=self.message, cursor_position=len(text))
+        elif not text:
+            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
