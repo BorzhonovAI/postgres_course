@@ -10,7 +10,7 @@ from rich.table import Table
 from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
-from product_categories import ProductCategory, get_product_categories
+from product_categories import get_product_categories, get_category_name_by_id
 from validators import NonEmptyValidator, YesNoValidator, PriceValidator
 
 
@@ -21,15 +21,6 @@ class Product:
     name: str
     price: Decimal
     category_id: int
-
-
-def get_category_name_by_id(_id: int) -> str | None:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories WHERE id = %s", (_id,))
-        category: ProductCategory | None = cur.fetchone()
-
-    return category.name
 
 
 def _render_product(product: Product):  # pylint: disable=unused-argument
@@ -92,15 +83,6 @@ def show_product(_id: str) -> None:
         return
 
     _render_product(product)
-
-
-def get_category_by_name(category_name: str) -> ProductCategory | None:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (category_name,))
-        category: ProductCategory | None = cur.fetchone()
-
-    return category
 
 
 @command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS)
@@ -193,15 +175,6 @@ def products_count() -> int:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
         cur.execute("SELECT * FROM catalog.products")
-        products: list[Product] = cur.fetchall()
-
-    return len(products)
-
-
-def products_count_by_category_id(_id: int) -> int:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(Product)) as cur:
-        cur.execute("SELECT * FROM catalog.products WHERE category_id = %s", (_id,))
         products: list[Product] = cur.fetchall()
 
     return len(products)

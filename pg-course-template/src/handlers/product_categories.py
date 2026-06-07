@@ -17,6 +17,24 @@ class ProductCategory:
     name: str
 
 
+def get_category_name_by_id(_id: int) -> str | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories WHERE id = %s", (_id,))
+        category: ProductCategory | None = cur.fetchone()
+
+    return category.name
+
+
+def get_category_by_name(category_name: str) -> ProductCategory | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (category_name,))
+        category: ProductCategory | None = cur.fetchone()
+
+    return category
+
+
 def _render_product_category(category: ProductCategory) -> None:
     table = Table(show_header=False, box=None, padding=(0, 2))
 
@@ -110,10 +128,17 @@ def edit_category(_id: str) -> None:
     console.print(f"[green]Категория товара обновлена [/green]")
 
 
+def products_count_by_category_id(_id: int) -> int:
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.products WHERE category_id = %s", (_id,))
+        count = cur.fetchone()
+
+    return count[0]
+
+
 @command("delete product_category", "удалить категорию товара", CATEGORY_PRODUCTS_CATEGORIES)
 def delete_category(_id: str) -> None:
-    from products import products_count_by_category_id
-
     conn = get_conn()
 
     with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
