@@ -164,11 +164,11 @@ def delete_category(_id: str) -> None:
 
 def product_categories_count() -> int:
     conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories")
-        product_categories: list[ProductCategory] = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.product_categories")
+        count = cur.fetchone()
 
-    return len(product_categories)
+    return count[0]
 
 
 def get_product_categories_names() -> list[str]:

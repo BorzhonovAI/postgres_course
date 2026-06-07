@@ -108,11 +108,11 @@ def show_warehouse(_id: str) -> None:
 
 def warehouses_count() -> int:
     conn = get_conn()
-    with conn.cursor(row_factory=class_row(Warehouse)) as cur:
-        cur.execute("SELECT * FROM catalog.warehouses")
-        warehouses: list[Warehouse] = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.warehouses")
+        count = cur.fetchone()
 
-    return len(warehouses)
+    return count[0]
 
 
 def warehouses_empty() -> bool:

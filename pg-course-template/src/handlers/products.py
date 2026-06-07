@@ -173,11 +173,11 @@ def delete_product(_id: str) -> None:
 
 def products_count() -> int:
     conn = get_conn()
-    with conn.cursor(row_factory=class_row(Product)) as cur:
-        cur.execute("SELECT * FROM catalog.products")
-        products: list[Product] = cur.fetchall()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.products")
+        count = cur.fetchone()
 
-    return len(products)
+    return count[0]
 
 
 @command("delete all products", "удалить все товары", CATEGORY_PRODUCTS)
