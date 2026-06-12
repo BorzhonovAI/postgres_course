@@ -1,3 +1,5 @@
+import logging
+
 from prompt_toolkit import prompt
 from psycopg.rows import class_row
 from rich.panel import Panel
@@ -181,7 +183,14 @@ def delete_category(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
+        try:
+            conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
+        except Exception as e:
+            render_error(
+                f"Не удалось удалить категорию товара с ID {_id}, "
+                f"возможно на товары данной категории были созданы заказы")
+            logging.error(e.args[-1])
+            return
 
         console.print(f"[green]Категория товара удалена [/green]")
 
