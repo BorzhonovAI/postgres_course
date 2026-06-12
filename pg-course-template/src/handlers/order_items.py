@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
@@ -19,7 +20,7 @@ class OrderItem:
     order_id: int
     product_id: int
     quantity: int
-    price: int
+    price: Decimal
 
 
 def _render_order_item(item: OrderItem) -> None:
