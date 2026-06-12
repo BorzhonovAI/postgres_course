@@ -51,7 +51,7 @@ def add_order_item(order_id: str) -> None:
 
     products = get_products()
 
-    if len(products) is 0:
+    if len(products) == 0:
         render_error(f"Нет товаров для добавления")
         return
 
@@ -103,7 +103,7 @@ def edit_order_item(order_id: str) -> None:
         cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
         items: list[OrderItem] = cur.fetchall()
 
-    if len(items) is 0:
+    if len(items) == 0:
         render_error(f"В заказе с ID {order_id} нет товаров")
         return
 
@@ -141,7 +141,7 @@ def delete_order_item(order_id: str) -> None:
         cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
         items: list[OrderItem] = cur.fetchall()
 
-    if len(items) is 0:
+    if len(items) == 0:
         render_error(f"В заказе с ID {order_id} нет товаров")
         return
 
