@@ -24,6 +24,18 @@ class Order:
     warehouse_id: int
 
 
+def get_unpublished_orders_by_warehouse_id(_id: int) -> list[Order]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Order)) as cur:
+        cur.execute(
+            "SELECT * FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
+            (_id,)
+        )
+        orders: list[Order] = cur.fetchall()
+
+    return orders
+
+
 def get_order_by_id(_id: int) -> Order | None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -43,7 +55,8 @@ def _render_order(order: Order):
     table.add_row("Статус", order.status)
     table.add_row("Суммарная стоимость", str(order.total_amount))
     table.add_row("Время создания", order.created_at)
-    table.add_row("Склад", get_warehouse_full_address(order.warehouse_id))
+    address = get_warehouse_full_address(order.warehouse_id)
+    table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
 
     panel = Panel(
         table,
@@ -71,12 +84,13 @@ def list_orders() -> None:
         orders: list[Order] = cur.fetchall()
 
     for order in orders:
+        address = get_warehouse_full_address(order.warehouse_id)
         table.add_row(
             str(order.id),
             order.status,
             str(order.total_amount),
             order.created_at,
-            get_warehouse_full_address(order.warehouse_id),
+            address if len(address) != 0 else "Неизвестно",
         )
     console.print(table)
 

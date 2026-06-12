@@ -8,6 +8,7 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
+from orders import get_unpublished_orders_by_warehouse_id
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_WAREHOUSES
 
@@ -232,11 +233,19 @@ def delete_warehouse(_id: str) -> None:
                      f"центральный склад")
         return
 
+    unpublished_orders = get_unpublished_orders_by_warehouse_id(int(_id))
+    if len(unpublished_orders) != 0:
+        console.log(f"[yellow bold]Предупреждение:[/bold yellow]: При удалении склада будет удалено "
+                    f"{len(unpublished_orders)} неопубликованных заказов с этого склада")
+
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        # TODO добавить обработку связанных заказов
-        conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
+        with conn.transaction():
+            conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
+            for order in unpublished_orders:
+                conn.execute("DELETE FROM sales.orders WHERE id = %s", (order.id,))
+
         if warehouse.label:
             console.print(
                 f"[green]Склад в городе {warehouse.city} ({warehouse.label}) удален [/green]"
