@@ -65,7 +65,7 @@ def _render_order_item(item: OrderItem) -> None:
     console.print(panel)
 
 
-@command("add order_item", "добавить товар(ы) к заказу (интерактивно)", CATEGORY_ORDER_ITEMS)
+@command("add order_item", "добавить товар к заказу (интерактивно)", CATEGORY_ORDER_ITEMS)
 def add_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -122,14 +122,14 @@ def add_order_item(order_id: int) -> None:
             (total_amount, order_id),
         )
 
-    console.print(f"[green]Товар(ы) {product.name} добавлен(ы) к заказу ({order_id})  [/green]")
+    console.print(f"[green]Товар {product.name} добавлен к заказу ({order_id})  [/green]")
 
     answer = prompt("Желаете добавить еще товары? (y/n, д/н): ", validator=YesNoValidator())
     if YesNoValidator.is_yes(answer):
         add_order_item(order_id)
 
 
-@command("edit order_item", "редактировать товар(ы) в заказе", CATEGORY_ORDER_ITEMS)
+@command("edit order_item", "редактировать товар в заказе", CATEGORY_ORDER_ITEMS)
 def edit_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -175,10 +175,10 @@ def edit_order_item(order_id: int) -> None:
             (total_amount, order_id),
         )
 
-    console.print(f"[green]Товар(ы) {product.name} обновлен(ы) в заказе ({order_id})  [/green]")
+    console.print(f"[green]Товар {product.name} обновлен в заказе ({order_id})  [/green]")
 
 
-@command("delete order_item", "удалить товар(ы) из заказа", CATEGORY_ORDER_ITEMS)
+@command("delete order_item", "удалить товар из заказа", CATEGORY_ORDER_ITEMS)
 def delete_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -221,4 +221,4 @@ def delete_order_item(order_id: int) -> None:
                 (total_amount, order_id),
             )
 
-        console.print(f"[green]Товар(ы) удален(ы) из заказа ({order_id}) [/green]")
+        console.print(f"[green]Товар удален из заказа ({order_id}) [/green]")
