@@ -159,7 +159,7 @@ def edit_order(_id: str) -> None:
         default=order.warehouse_id
     )
 
-    # можно добавить вызов edit_order_item
+    # TODO можно добавить вызов edit_order_item
 
     conn.execute(
         "UPDATE sales.orders SET warehouse_id = %s WHERE id = %s",
@@ -188,3 +188,27 @@ def delete_order(_id: str) -> None:
         conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
         conn.execute("DELETE FROM sales.order_items WHERE order__id = %s", (_id,))
         console.print(f"[green]Заказ #{_id} удален [/green]")
+
+
+@command("publish order", "опубликовать заказ", CATEGORY_ORDERS)
+def publish_order(_id: str) -> None:
+    conn = get_conn()
+
+    with conn.cursor(row_factory=class_row(Order)) as cur:
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
+        order: Order | None = cur.fetchone()
+
+    if order is None:
+        render_error(f"Заказ с ID {_id} не найден")
+        return
+
+    if order.status != "unpublished":
+        render_error(f"Заказ с ID {_id}  уже опубликован")
+        return
+
+    conn.execute(
+        "UPDATE sales.orders SET status = %s WHERE id = %s",
+        ("new", _id),
+    )
+
+    console.print(f"[green]Заказ #{_id} опубликован [/green]")
