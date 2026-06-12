@@ -68,7 +68,16 @@ def add_order_item(order_id: str) -> None:
         completer=product_name_completer
     ).strip()
     product = get_product_by_name(product_name)
-    # TODO check if that order item already exists
+    with conn.cursor(row_factory=class_row(OrderItem)) as cur:
+        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+                    (order_id, product.id))
+        item: OrderItem | None = cur.fetchone()
+
+    if item is None:
+        render_error(
+            f"В заказе с ID {order_id} уже есть такой товар,"
+            f" если желаете изменить количество - воспользуйтесь командой 'edit order_item'")
+        return
 
     quantity = prompt("Количество: ", validator=QuantityValidator()).strip()
 
@@ -79,7 +88,9 @@ def add_order_item(order_id: str) -> None:
 
     console.print(f"[green]Товар(ы) {product.name} добавлен(ы) к заказу ({order_id})  [/green]")
 
-    # TODO ask for more
+    answer = prompt("Желаете добавить еще товары? (y/n, д/н): ", validator=YesNoValidator())
+    if YesNoValidator.is_yes(answer):
+        add_order_item(order_id)
 
 
 @command("edit order_item", "редактировать товар(ы) в заказе", CATEGORY_ORDER_ITEMS)
