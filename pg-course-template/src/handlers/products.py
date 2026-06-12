@@ -215,7 +215,7 @@ def delete_product(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        # TODO вероятно здесь стоит добавить какую то обработку связанного заказа
+        # TODO вероятно здесь стоит добавить какую то обработку связанного заказа, но че то это сложно уже
         conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
