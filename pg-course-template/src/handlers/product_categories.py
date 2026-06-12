@@ -181,9 +181,7 @@ def delete_category(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        with conn.transaction():
-            conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
-            conn.execute("DELETE FROM catalog.products WHERE category_id = %s", (_id,))
+        conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
 
         console.print(f"[green]Категория товара удалена [/green]")
 
