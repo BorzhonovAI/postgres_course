@@ -52,6 +52,15 @@ def get_product_by_name(name: str) -> Product | None:
     return product
 
 
+def get_product_by_sku(sku: str) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE sku = %s", (sku,))
+        product: Product | None = cur.fetchone()
+
+    return product
+
+
 def get_product_by_id(_id: int) -> Product | None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:

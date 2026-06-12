@@ -16,13 +16,13 @@ from warehouses import get_warehouse_full_address, get_warehouses
 def _render_order(order: Order):
     table = Table(show_header=False, box=None, padding=(0, 2))
 
-    table.add_column("Поле", style="bold cyan", width=15)
+    table.add_column("Поле", style="bold cyan", width=20)
     table.add_column("Значение", style="white")
 
     table.add_row("ID", str(order.id))
     table.add_row("Статус", order.status)
     table.add_row("Суммарная стоимость", str(order.total_amount))
-    table.add_row("Время создания", order.created_at)
+    table.add_row("Время создания", order.created_at.isoformat())
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
 
@@ -57,7 +57,7 @@ def list_orders() -> None:
             str(order.id),
             order.status,
             str(order.total_amount),
-            order.created_at,
+            order.created_at.isoformat(),
             address if len(address) != 0 else "Неизвестно",
         )
     console.print(table)
@@ -89,14 +89,15 @@ def add_order() -> None:
         options=warehouses_options
     )
 
-    order_id = conn.execute(
-        "INSERT INTO sales.orders (warehouse_id) VALUES (%s) RETURNING id",
-        (warehouse_id,),
-    ).fetchone()[0]
+    with conn.transaction():
+        order_id = conn.execute(
+            "INSERT INTO sales.orders (warehouse_id) VALUES (%s) RETURNING id",
+            (warehouse_id,),
+        ).fetchone()[0]
 
-    answer = prompt("Желаете добавить товары к заказу? (y/n, д/н): ", validator=YesNoValidator())
-    if YesNoValidator.is_yes(answer):
-        add_order_item(order_id)
+        answer = prompt("Желаете добавить товары к заказу? (y/n, д/н): ", validator=YesNoValidator())
+        if YesNoValidator.is_yes(answer):
+            add_order_item(order_id)
 
     console.print(f"[green]Заказ #{order_id} добавлен [/green]")
     show_order(order_id)
@@ -154,7 +155,7 @@ def delete_order(_id: str) -> None:
 
     if YesNoValidator.is_yes(answer):
         conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
-        conn.execute("DELETE FROM sales.order_items WHERE order__id = %s", (_id,))
+        conn.execute("DELETE FROM sales.order_items WHERE order_id = %s", (_id,))
         console.print(f"[green]Заказ #{_id} удален [/green]")
 
 

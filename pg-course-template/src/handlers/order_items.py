@@ -10,8 +10,8 @@ from rich.table import Table
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
-from products import get_product_name_by_id, get_product_by_name, get_products, get_product_by_id
-from structures import OrderItem, Order
+from products import get_product_name_by_id, get_products, get_product_by_id, get_product_by_sku
+from structures import OrderItem, Order, Product
 from validators import YesNoValidator, ChoiceValidator, QuantityValidator
 
 
@@ -34,6 +34,14 @@ def check_order(order_id: int) -> bool:
         return False
 
     return True
+
+
+def get_sku(product_name_with_sku: str) -> str | None:
+    start = product_name_with_sku.find("(")
+    end = product_name_with_sku.find(")", start)
+    if start != -1 and end != -1:
+        return product_name_with_sku[start + 1:end]
+    return None
 
 
 def _render_order_item(item: OrderItem) -> None:
@@ -77,18 +85,21 @@ def add_order_item(order_id: int) -> None:
                               "Используйте Tab для автодополнения."
     )
 
-    product_name = prompt(
+    # TODO здесь бы на самом деле лучше подошел choice
+    product_name_with_sku = prompt(
         "Имя товара: ",
         validator=product_name_validator,
         completer=product_name_completer
     ).strip()
-    product = get_product_by_name(product_name)
+    sku = get_sku(product_name_with_sku)
+    product: Product = get_product_by_sku(sku)
+
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
         cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
                     (order_id, product.id))
         item: OrderItem | None = cur.fetchone()
 
-    if item is None:
+    if not item is None:
         render_error(
             f"В заказе с ID {order_id} уже есть такой товар,"
             f" если желаете изменить количество - воспользуйтесь командой 'edit order_item'")
@@ -97,11 +108,14 @@ def add_order_item(order_id: int) -> None:
     quantity = prompt("Количество: ", validator=QuantityValidator()).strip()
 
     with conn.transaction():
-        conn.execute(
-            "INSERT INTO sales.order_items (order_id, product_id, quantity, price) VALUES (%s, %s, %s, %s)",
-            (order_id, product.id, quantity, product.price),
-        )
-        order = get_order_by_id(order_id)
+        with conn.cursor(row_factory=class_row(OrderItem)) as cur:
+            item: OrderItem = cur.execute(
+                """INSERT INTO sales.order_items (order_id, product_id, quantity, price) 
+                VALUES (%s, %s, %s, %s) RETURNING *""",
+                (order_id, product.id, quantity, product.price),
+            ).fetchone()
+
+        order: Order = get_order_by_id(order_id)
         total_amount = order.total_amount + item.quantity * item.price
         conn.execute(
             "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
