@@ -205,7 +205,7 @@ def delete_product(_id: str) -> None:
         product: Product | None = cur.fetchone()
 
     if product is None:
-        render_error(f"Склад с ID {_id} не найден")
+        render_error(f"Продукт с ID {_id} не найден")
         return
 
     _render_product(product)
@@ -213,8 +213,11 @@ def delete_product(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        # TODO вероятно здесь стоит добавить какую то обработку связанного заказа, но че то это сложно уже
-        conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
+        try:
+            conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
+        except Exception:
+            render_error(f"Продукт с ID {_id} не может быть удалён пока на него есть заказ")
+            return
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
 
