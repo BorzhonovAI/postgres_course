@@ -11,6 +11,7 @@ from rich.table import Table
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
+from orders import get_order_by_id
 from products import get_product_name_by_id, get_product_by_name, get_products, get_product_by_id
 from validators import YesNoValidator, ChoiceValidator, QuantityValidator
 
@@ -21,6 +22,18 @@ class OrderItem:
     product_id: int
     quantity: int
     price: Decimal
+
+
+def check_order(order_id: int) -> bool:
+    order = get_order_by_id(order_id)
+    if order is None:
+        render_error(f"Нет заказа с ID {order_id}")
+        return False
+    if order.status != "unpublished":
+        render_error(f"Заказ с ID {order_id} уже опубликован и не может быть изменён")
+        return False
+
+    return True
 
 
 def _render_order_item(item: OrderItem) -> None:
@@ -45,10 +58,11 @@ def _render_order_item(item: OrderItem) -> None:
 
 
 @command("add order_item", "добавить товар(ы) к заказу (интерактивно)", CATEGORY_ORDER_ITEMS)
-def add_order_item(order_id: str) -> None:
+def add_order_item(order_id: int) -> None:
     conn = get_conn()
 
-    # TODO check if order exists and its status
+    if not check_order(order_id):
+        return
 
     products = get_products()
 
@@ -82,10 +96,17 @@ def add_order_item(order_id: str) -> None:
 
     quantity = prompt("Количество: ", validator=QuantityValidator()).strip()
 
-    conn.execute(
-        "INSERT INTO sales.order_items (order_id, product_id, quantity, price) VALUES (%s, %s, %s, %s)",
-        (order_id, product.id, quantity, product.price),
-    )
+    with conn.transaction():
+        conn.execute(
+            "INSERT INTO sales.order_items (order_id, product_id, quantity, price) VALUES (%s, %s, %s, %s)",
+            (order_id, product.id, quantity, product.price),
+        )
+        order = get_order_by_id(order_id)
+        total_amount = order.total_amount + item.quantity * item.price
+        conn.execute(
+            "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
+            (total_amount, order_id),
+        )
 
     console.print(f"[green]Товар(ы) {product.name} добавлен(ы) к заказу ({order_id})  [/green]")
 
@@ -95,10 +116,11 @@ def add_order_item(order_id: str) -> None:
 
 
 @command("edit order_item", "редактировать товар(ы) в заказе", CATEGORY_ORDER_ITEMS)
-def edit_order_item(order_id: str) -> None:
+def edit_order_item(order_id: int) -> None:
     conn = get_conn()
 
-    # TODO check if order exists and its status
+    if not check_order(order_id):
+        return
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
         cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
@@ -124,19 +146,30 @@ def edit_order_item(order_id: str) -> None:
     quantity = prompt("Количество: ", default=str(item.quantity), validator=QuantityValidator()).strip()
     product = get_product_by_id(product_id)
 
-    conn.execute(
-        """UPDATE sales.order_items SET quantity = %s, price = %s
-        WHERE order_id = %s AND product_id=%s""",
-        (quantity, product.price, order_id, product_id)
-    )
+    with conn.transaction():
+        conn.execute(
+            """UPDATE sales.order_items SET quantity = %s, price = %s
+            WHERE order_id = %s AND product_id=%s""",
+            (quantity, product.price, order_id, product_id)
+        )
+        order = get_order_by_id(order_id)
+        total_amount = (order.total_amount -
+                        Decimal(item.quantity) * item.price +
+                        Decimal(quantity) * product.price)
+        conn.execute(
+            "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
+            (total_amount, order_id),
+        )
+
     console.print(f"[green]Товар(ы) {product.name} обновлен(ы) в заказе ({order_id})  [/green]")
 
 
 @command("delete order_item", "удалить товар(ы) из заказа", CATEGORY_ORDER_ITEMS)
-def delete_order_item(order_id: str) -> None:
+def delete_order_item(order_id: int) -> None:
     conn = get_conn()
 
-    # TODO check if order exists and its status
+    if not check_order(order_id):
+        return
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
         cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
@@ -164,5 +197,14 @@ def delete_order_item(order_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM sales.order_items WHERE order_id = %s AND product_id=%s", (order_id, product_id))
+        with conn.transaction():
+            conn.execute("DELETE FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+                         (order_id, product_id))
+            order = get_order_by_id(order_id)
+            total_amount = order.total_amount - Decimal(item.quantity) * item.price
+            conn.execute(
+                "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
+                (total_amount, order_id),
+            )
+
         console.print(f"[green]Товар(ы) удален(ы) из заказа ({order_id}) [/green]")
