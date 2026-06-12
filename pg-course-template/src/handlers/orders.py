@@ -24,6 +24,15 @@ class Order:
     warehouse_id: int
 
 
+def get_order_by_id(_id: int) -> Order | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Order)) as cur:
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
+        order: Order | None = cur.fetchone()
+
+    return order
+
+
 def _render_order(order: Order):
     table = Table(show_header=False, box=None, padding=(0, 2))
 
