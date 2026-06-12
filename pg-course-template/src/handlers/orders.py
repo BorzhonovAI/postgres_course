@@ -22,7 +22,7 @@ def _render_order(order: Order):
     table.add_row("ID", str(order.id))
     table.add_row("Статус", order.status)
     table.add_row("Суммарная стоимость", str(order.total_amount))
-    table.add_row("Время создания", order.created_at.isoformat())
+    table.add_row("Время создания", order.created_at.astimezone().isoformat(timespec='seconds'))
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
 
@@ -57,7 +57,7 @@ def list_orders() -> None:
             str(order.id),
             order.status,
             str(order.total_amount),
-            order.created_at.isoformat(),
+            order.created_at.astimezone().isoformat(timespec='seconds'),
             address if len(address) != 0 else "Неизвестно",
         )
     console.print(table)
