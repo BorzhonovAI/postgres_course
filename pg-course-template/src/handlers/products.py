@@ -23,6 +23,55 @@ class Product:
     category_id: int
 
 
+def get_product_name_by_id(_id: int) -> str:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    return product.name
+
+
+def get_products_names() -> list[str]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products")
+        products: list[Product] = cur.fetchall()
+
+    names_list: list[str] = []
+    for product in products:
+        names_list.append(product.name)
+
+    return names_list
+
+
+def get_products() -> list[Product]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products")
+        products: list[Product] = cur.fetchall()
+
+    return products
+
+
+def get_product_by_name(name: str) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE name = %s", (name,))
+        product: Product | None = cur.fetchone()
+
+    return product
+
+
+def get_product_by_id(_id: int) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    return product
+
+
 def _render_product(product: Product):  # pylint: disable=unused-argument
     table = Table(show_header=False, box=None, padding=(0, 2))
 
@@ -166,6 +215,7 @@ def delete_product(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
+        # TODO вероятно здесь стоит добавить какую то обработку связанного заказа
         conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
