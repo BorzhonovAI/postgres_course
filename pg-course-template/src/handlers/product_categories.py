@@ -35,6 +35,37 @@ def get_category_by_name(category_name: str) -> ProductCategory | None:
     return category
 
 
+def product_categories_count() -> int:
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.product_categories")
+        count = cur.fetchone()
+
+    return count[0]
+ 
+
+def get_product_categories_names() -> list[str]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    names_list: list[str] = []
+    for category in product_categories:
+        names_list.append(category.name)
+
+    return names_list
+
+
+def get_product_categories() -> list[ProductCategory]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    return product_categories
+
+
 def _render_product_category(category: ProductCategory) -> None:
     table = Table(show_header=False, box=None, padding=(0, 2))
 
@@ -157,40 +188,11 @@ def delete_category(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
-        conn.execute("DELETE FROM catalog.products WHERE category_id = %s", (_id,))
+        with conn.transaction():
+            conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
+            conn.execute("DELETE FROM catalog.products WHERE category_id = %s", (_id,))
+
         console.print(f"[green]Категория товара удалена [/green]")
-
-
-def product_categories_count() -> int:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM catalog.product_categories")
-        count = cur.fetchone()
-
-    return count[0]
-
-
-def get_product_categories_names() -> list[str]:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories")
-        product_categories: list[ProductCategory] = cur.fetchall()
-
-    names_list: list[str] = []
-    for category in product_categories:
-        names_list.append(category.name)
-
-    return names_list
-
-
-def get_product_categories() -> list[ProductCategory]:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories")
-        product_categories: list[ProductCategory] = cur.fetchall()
-
-    return product_categories
 
 
 @command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
@@ -208,6 +210,8 @@ def delete_all_product_categories() -> None:
     ))
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("TRUNCATE TABLE catalog.products")
-        conn.execute("TRUNCATE TABLE catalog.product_categories")
+        with conn.transaction():
+            conn.execute("TRUNCATE TABLE catalog.products")
+            conn.execute("TRUNCATE TABLE catalog.product_categories")
+
         console.print(f"[green]Все категории товаров удалены [/green]")
