@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from psycopg.rows import class_row
@@ -8,7 +6,7 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
-from orders import get_unpublished_orders_by_warehouse_id
+from structures import Warehouse, Order
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_WAREHOUSES
 
@@ -36,13 +34,16 @@ city_validator = ChoiceValidator(
 )
 
 
-@dataclass
-class Warehouse:
-    id: int
-    city: str
-    address: str
-    label: str | None
-    is_central: bool
+def get_unpublished_orders_by_warehouse_id(_id: int) -> list[Order]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Order)) as cur:
+        cur.execute(
+            "SELECT * FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
+            (_id,)
+        )
+        orders: list[Order] = cur.fetchall()
+
+    return orders
 
 
 def get_warehouse_by_id(_id: int) -> Warehouse | None:

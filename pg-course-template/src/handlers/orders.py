@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from decimal import Decimal
-
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import choice
 from psycopg.rows import class_row
@@ -11,38 +8,9 @@ from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
 from order_items import add_order_item
+from structures import Order
 from validators import YesNoValidator
 from warehouses import get_warehouse_full_address, get_warehouses
-
-
-@dataclass
-class Order:
-    id: int
-    status: str
-    total_amount: Decimal
-    created_at: str
-    warehouse_id: int
-
-
-def get_unpublished_orders_by_warehouse_id(_id: int) -> list[Order]:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute(
-            "SELECT * FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
-            (_id,)
-        )
-        orders: list[Order] = cur.fetchall()
-
-    return orders
-
-
-def get_order_by_id(_id: int) -> Order | None:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
-        order: Order | None = cur.fetchone()
-
-    return order
 
 
 def _render_order(order: Order):

@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from prompt_toolkit import prompt
 from psycopg.rows import class_row
 from rich.panel import Panel
@@ -7,14 +5,9 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
+from structures import ProductCategory
 from validators import NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_PRODUCTS_CATEGORIES
-
-
-@dataclass
-class ProductCategory:
-    id: int
-    name: str
 
 
 def get_category_name_by_id(_id: int) -> str | None:
@@ -42,7 +35,7 @@ def product_categories_count() -> int:
         count = cur.fetchone()
 
     return count[0]
- 
+
 
 def get_product_categories_names() -> list[str]:
     conn = get_conn()

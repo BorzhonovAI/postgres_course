@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from decimal import Decimal
-
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import choice
 from psycopg.rows import class_row
@@ -11,16 +8,8 @@ from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
 from product_categories import get_product_categories, get_category_name_by_id
+from structures import Product
 from validators import NonEmptyValidator, YesNoValidator, PriceValidator
-
-
-@dataclass
-class Product:
-    id: int
-    sku: str
-    name: str
-    price: Decimal
-    category_id: int
 
 
 def get_product_name_by_id(_id: int) -> str:

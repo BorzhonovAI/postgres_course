@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from decimal import Decimal
 
 from prompt_toolkit import prompt
@@ -11,17 +10,18 @@ from rich.table import Table
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
-from orders import get_order_by_id
 from products import get_product_name_by_id, get_product_by_name, get_products, get_product_by_id
+from structures import OrderItem, Order
 from validators import YesNoValidator, ChoiceValidator, QuantityValidator
 
 
-@dataclass
-class OrderItem:
-    order_id: int
-    product_id: int
-    quantity: int
-    price: Decimal
+def get_order_by_id(_id: int) -> Order | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Order)) as cur:
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
+        order: Order | None = cur.fetchone()
+
+    return order
 
 
 def check_order(order_id: int) -> bool:
