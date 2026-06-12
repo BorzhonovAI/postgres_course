@@ -34,16 +34,16 @@ city_validator = ChoiceValidator(
 )
 
 
-def get_unpublished_orders_by_warehouse_id(_id: int) -> list[Order]:
+def get_orders_count_by_warehouse_id(_id: int) -> int:
     conn = get_conn()
-    with conn.cursor(row_factory=class_row(Order)) as cur:
+    with conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
+            "SELECT COUNT(*) FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
             (_id,)
         )
-        orders: list[Order] = cur.fetchall()
+        orders_count: int = cur.fetchone()[0]
 
-    return orders
+    return orders_count
 
 
 def get_warehouse_by_id(_id: int) -> Warehouse | None:
@@ -234,18 +234,15 @@ def delete_warehouse(_id: str) -> None:
                      f"центральный склад")
         return
 
-    unpublished_orders = get_unpublished_orders_by_warehouse_id(int(_id))
-    if len(unpublished_orders) != 0:
-        console.log(f"[yellow bold]Предупреждение:[/bold yellow]: При удалении склада будет удалено "
-                    f"{len(unpublished_orders)} неопубликованных заказов с этого склада")
+    count = get_orders_count_by_warehouse_id(int(_id))
+    if count != 0:
+        render_error("Нельзя удалить склад пока на нем есть заказы")
+        return
 
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        with conn.transaction():
-            conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
-            for order in unpublished_orders:
-                conn.execute("DELETE FROM sales.orders WHERE id = %s", (order.id,))
+        conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
 
         if warehouse.label:
             console.print(
