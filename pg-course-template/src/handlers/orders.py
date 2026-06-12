@@ -149,13 +149,19 @@ def delete_order(_id: str) -> None:
         render_error(f"Заказ с ID {_id} не найден")
         return
 
+    if order.status != "unpublished":
+        render_error(f"Заказ с ID {_id} опубликован и не может быть удален")
+        return
+
     _render_order(order)
 
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
-        conn.execute("DELETE FROM sales.order_items WHERE order_id = %s", (_id,))
+        with conn.transaction():
+            conn.execute("DELETE FROM sales.order_items WHERE order_id = %s", (_id,))
+            conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
+
         console.print(f"[green]Заказ #{_id} удален [/green]")
 
 
