@@ -44,6 +44,30 @@ class Warehouse:
     is_central: bool
 
 
+def get_warehouse_by_id(_id: int) -> Warehouse | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Warehouse)) as cur:
+        cur.execute("SELECT * FROM catalog.warehouses WHERE id = %s", (_id,))
+        warehouse: Warehouse | None = cur.fetchone()
+
+    return warehouse
+
+
+# Использовать только при полной уверенности в существовании склада
+def get_warehouse_full_address(_id: int) -> str:
+    warehouse = get_warehouse_by_id(_id)
+    return f"г. {warehouse.city}, {warehouse.address}"
+
+
+def get_warehouses() -> list[Warehouse]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Warehouse)) as cur:
+        cur.execute("SELECT * FROM catalog.warehouses")
+        warehouses: list[Warehouse] = cur.fetchall()
+
+    return warehouses
+
+
 def _render_warehouse(warehouse: Warehouse) -> None:
     table = Table(show_header=False, box=None, padding=(0, 2))
 
@@ -211,6 +235,7 @@ def delete_warehouse(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
+        # TODO добавить обработку связанных заказов
         conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
         if warehouse.label:
             console.print(
