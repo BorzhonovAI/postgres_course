@@ -1,1 +1,0 @@
-ALTER TABLE sales.orders ALTER COLUMN created_at DROP DEFAULT;

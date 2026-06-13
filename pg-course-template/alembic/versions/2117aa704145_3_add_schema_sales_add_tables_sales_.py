@@ -1,4 +1,4 @@
-"""add schema sales, add tables sales.orders and sales.order_items
+"""[3]: add schema sales, add tables sales.orders and sales.order_items
 
 Revision ID: 2117aa704145
 Revises: cd9c239e42b4
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '2117aa704145'
-down_revision: Union[str, None] = 'cd9c239e42b4'
+down_revision: Union[str, None] = '8e5024d6a191'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

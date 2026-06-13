@@ -10,7 +10,8 @@ create table catalog.products (
         sku VARCHAR(30) UNIQUE NOT NULL,
 	name TEXT NOT NULL,
 	price integer NOT NULL,
-	category_id integer NOT NULL
+	category_id integer NOT NULL,
+	FOREIGN KEY (category_id) REFERENCES catalog.product_categories(id) ON DELETE CASCADE
 );
 create table catalog.warehouses (
         id serial PRIMARY KEY,
