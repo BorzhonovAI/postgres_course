@@ -65,6 +65,18 @@ def _render_order_item(item: OrderItem) -> None:
     console.print(panel)
 
 
+def is_product_in_order(order_id: int, product: Product) -> bool:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(OrderItem)) as cur:
+        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+                    (order_id, product.id))
+        item: OrderItem | None = cur.fetchone()
+
+    if not item is None:
+        return True
+    return False
+
+
 @command("add order_item", "добавить товар к заказу (интерактивно)", CATEGORY_ORDER_ITEMS)
 def add_order_item(order_id: int) -> None:
     conn = get_conn()
@@ -73,6 +85,7 @@ def add_order_item(order_id: int) -> None:
         return
 
     products = get_products()
+    products = [p for p in products if not is_product_in_order(order_id, p)]
 
     if len(products) == 0:
         render_error(f"Нет товаров для добавления")
@@ -85,7 +98,6 @@ def add_order_item(order_id: int) -> None:
                               "Используйте Tab для автодополнения."
     )
 
-    # TODO здесь бы на самом деле лучше подошел choice
     product_name_with_sku = prompt(
         "Имя товара: ",
         validator=product_name_validator,
@@ -93,17 +105,6 @@ def add_order_item(order_id: int) -> None:
     ).strip()
     sku = get_sku(product_name_with_sku)
     product: Product = get_product_by_sku(sku)
-
-    with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
-                    (order_id, product.id))
-        item: OrderItem | None = cur.fetchone()
-
-    if not item is None:
-        render_error(
-            f"В заказе с ID {order_id} уже есть такой товар,"
-            f" если желаете изменить количество - воспользуйтесь командой 'edit order_item'")
-        return
 
     quantity = prompt("Количество: ", validator=QuantityValidator()).strip()
 

@@ -95,7 +95,10 @@ def add_order() -> None:
             (warehouse_id,),
         ).fetchone()[0]
 
-        answer = prompt("Желаете добавить товары к заказу? (y/n, д/н): ", validator=YesNoValidator())
+        answer = prompt(
+            "Желаете добавить товары к заказу? (y/n, д/н): ",
+            validator=YesNoValidator()
+        )
         if YesNoValidator.is_yes(answer):
             add_order_item(order_id)
 
@@ -127,8 +130,6 @@ def edit_order(_id: str) -> None:
         options=warehouses_options,
         default=order.warehouse_id
     )
-
-    # TODO можно добавить вызов edit_order_item
 
     conn.execute(
         "UPDATE sales.orders SET warehouse_id = %s WHERE id = %s",
