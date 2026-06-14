@@ -65,14 +65,17 @@ def _render_order_item(item: OrderItem) -> None:
     console.print(panel)
 
 
-def is_product_in_order(order_id: int, product: Product) -> bool:
+def get_order_items(order_id: int) -> list[OrderItem]:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
-                    (order_id, product.id))
-        item: OrderItem | None = cur.fetchone()
+        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
+        items: list[OrderItem] = cur.fetchall()
 
-    if not item is None:
+    return items
+
+
+def is_product_in_order(order_items: list[OrderItem], product: Product) -> bool:
+    if any(item.product_id == product.id for item in order_items):
         return True
     return False
 
@@ -85,7 +88,8 @@ def add_order_item(order_id: int) -> None:
         return
 
     products = get_products()
-    products = [p for p in products if not is_product_in_order(order_id, p)]
+    order_items = get_order_items(order_id)
+    products = [p for p in products if not is_product_in_order(order_items, p)]
 
     if len(products) == 0:
         render_error(f"Нет товаров для добавления")
@@ -137,9 +141,7 @@ def edit_order_item(order_id: int) -> None:
     if not check_order(order_id):
         return
 
-    with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
-        items: list[OrderItem] = cur.fetchall()
+    items = get_order_items(order_id)
 
     if len(items) == 0:
         render_error(f"В заказе с ID {order_id} нет товаров")
@@ -186,9 +188,7 @@ def delete_order_item(order_id: int) -> None:
     if not check_order(order_id):
         return
 
-    with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s", (order_id,))
-        items: list[OrderItem] = cur.fetchall()
+    items = get_order_items(order_id)
 
     if len(items) == 0:
         render_error(f"В заказе с ID {order_id} нет товаров")
