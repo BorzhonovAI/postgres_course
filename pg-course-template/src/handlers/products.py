@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from decimal import Decimal
-
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import choice
 from psycopg.rows import class_row
@@ -11,16 +8,66 @@ from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
 from product_categories import get_product_categories, get_category_name_by_id
+from structures import Product
 from validators import NonEmptyValidator, YesNoValidator, PriceValidator
 
 
-@dataclass
-class Product:
-    id: int
-    sku: str
-    name: str
-    price: Decimal
-    category_id: int
+def get_product_name_by_id(_id: int) -> str:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    return product.name
+
+
+def get_products_names() -> list[str]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products")
+        products: list[Product] = cur.fetchall()
+
+    names_list: list[str] = []
+    for product in products:
+        names_list.append(product.name)
+
+    return names_list
+
+
+def get_products() -> list[Product]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products")
+        products: list[Product] = cur.fetchall()
+
+    return products
+
+
+def get_product_by_name(name: str) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE name = %s", (name,))
+        product: Product | None = cur.fetchone()
+
+    return product
+
+
+def get_product_by_sku(sku: str) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE sku = %s", (sku,))
+        product: Product | None = cur.fetchone()
+
+    return product
+
+
+def get_product_by_id(_id: int) -> Product | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Product)) as cur:
+        cur.execute("SELECT * FROM catalog.products WHERE id = %s", (_id,))
+        product: Product | None = cur.fetchone()
+
+    return product
 
 
 def _render_product(product: Product):  # pylint: disable=unused-argument
@@ -158,7 +205,7 @@ def delete_product(_id: str) -> None:
         product: Product | None = cur.fetchone()
 
     if product is None:
-        render_error(f"Склад с ID {_id} не найден")
+        render_error(f"Продукт с ID {_id} не найден")
         return
 
     _render_product(product)
@@ -166,7 +213,11 @@ def delete_product(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
+        try:
+            conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
+        except Exception:
+            render_error(f"Продукт с ID {_id} не может быть удалён пока на него есть заказ")
+            return
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
 

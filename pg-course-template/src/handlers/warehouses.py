@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from psycopg.rows import class_row
@@ -8,6 +6,7 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
+from structures import Warehouse, Order
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_WAREHOUSES
 
@@ -35,13 +34,40 @@ city_validator = ChoiceValidator(
 )
 
 
-@dataclass
-class Warehouse:
-    id: int
-    city: str
-    address: str
-    label: str | None
-    is_central: bool
+def get_orders_count_by_warehouse_id(_id: int) -> int:
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
+            (_id,)
+        )
+        orders_count: int = cur.fetchone()[0]
+
+    return orders_count
+
+
+def get_warehouse_by_id(_id: int) -> Warehouse | None:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Warehouse)) as cur:
+        cur.execute("SELECT * FROM catalog.warehouses WHERE id = %s", (_id,))
+        warehouse: Warehouse | None = cur.fetchone()
+
+    return warehouse
+
+
+# Использовать только при полной уверенности в существовании склада
+def get_warehouse_full_address(_id: int) -> str:
+    warehouse = get_warehouse_by_id(_id)
+    return f"г. {warehouse.city}, {warehouse.address}"
+
+
+def get_warehouses() -> list[Warehouse]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(Warehouse)) as cur:
+        cur.execute("SELECT * FROM catalog.warehouses")
+        warehouses: list[Warehouse] = cur.fetchall()
+
+    return warehouses
 
 
 def _render_warehouse(warehouse: Warehouse) -> None:
@@ -208,10 +234,16 @@ def delete_warehouse(_id: str) -> None:
                      f"центральный склад")
         return
 
+    count = get_orders_count_by_warehouse_id(int(_id))
+    if count != 0:
+        render_error("Нельзя удалить склад пока на нем есть заказы")
+        return
+
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
         conn.execute("DELETE FROM catalog.warehouses WHERE id = %s", (_id,))
+
         if warehouse.label:
             console.print(
                 f"[green]Склад в городе {warehouse.city} ({warehouse.label}) удален [/green]"

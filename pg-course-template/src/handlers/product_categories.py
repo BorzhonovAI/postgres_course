@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+import logging
 
 from prompt_toolkit import prompt
 from psycopg.rows import class_row
@@ -7,14 +7,9 @@ from rich.table import Table
 
 from console import console, render_error
 from db import get_conn
+from structures import ProductCategory
 from validators import NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_PRODUCTS_CATEGORIES
-
-
-@dataclass
-class ProductCategory:
-    id: int
-    name: str
 
 
 def get_category_name_by_id(_id: int) -> str | None:
@@ -33,6 +28,37 @@ def get_category_by_name(category_name: str) -> ProductCategory | None:
         category: ProductCategory | None = cur.fetchone()
 
     return category
+
+
+def product_categories_count() -> int:
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM catalog.product_categories")
+        count = cur.fetchone()
+
+    return count[0]
+
+
+def get_product_categories_names() -> list[str]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    names_list: list[str] = []
+    for category in product_categories:
+        names_list.append(category.name)
+
+    return names_list
+
+
+def get_product_categories() -> list[ProductCategory]:
+    conn = get_conn()
+    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
+        cur.execute("SELECT * FROM catalog.product_categories")
+        product_categories: list[ProductCategory] = cur.fetchall()
+
+    return product_categories
 
 
 def _render_product_category(category: ProductCategory) -> None:
@@ -157,40 +183,16 @@ def delete_category(_id: str) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
-        conn.execute("DELETE FROM catalog.products WHERE category_id = %s", (_id,))
+        try:
+            conn.execute("DELETE FROM catalog.product_categories WHERE id = %s", (_id,))
+        except Exception as e:
+            render_error(
+                f"Не удалось удалить категорию товара с ID {_id}, "
+                f"возможно на товары данной категории были созданы заказы")
+            logging.error(e.args[-1])
+            return
+
         console.print(f"[green]Категория товара удалена [/green]")
-
-
-def product_categories_count() -> int:
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FROM catalog.product_categories")
-        count = cur.fetchone()
-
-    return count[0]
-
-
-def get_product_categories_names() -> list[str]:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories")
-        product_categories: list[ProductCategory] = cur.fetchall()
-
-    names_list: list[str] = []
-    for category in product_categories:
-        names_list.append(category.name)
-
-    return names_list
-
-
-def get_product_categories() -> list[ProductCategory]:
-    conn = get_conn()
-    with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-        cur.execute("SELECT * FROM catalog.product_categories")
-        product_categories: list[ProductCategory] = cur.fetchall()
-
-    return product_categories
 
 
 @command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
@@ -208,6 +210,8 @@ def delete_all_product_categories() -> None:
     ))
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("TRUNCATE TABLE catalog.products")
-        conn.execute("TRUNCATE TABLE catalog.product_categories")
+        with conn.transaction():
+            conn.execute("TRUNCATE TABLE catalog.products")
+            conn.execute("TRUNCATE TABLE catalog.product_categories")
+
         console.print(f"[green]Все категории товаров удалены [/green]")

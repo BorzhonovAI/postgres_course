@@ -1,0 +1,20 @@
+CREATE SCHEMA catalog;
+create table catalog.product_categories (
+	id serial PRIMARY KEY,
+	name TEXT UNIQUE NOT NULL
+);
+create table catalog.products (
+        id serial PRIMARY KEY,
+        sku VARCHAR(30) UNIQUE NOT NULL,
+	name TEXT NOT NULL,
+	price decimal(10, 2) NOT NULL,
+	category_id integer NOT NULL,
+	FOREIGN KEY (category_id) REFERENCES catalog.product_categories(id) ON DELETE CASCADE
+);
+create table catalog.warehouses (
+        id serial PRIMARY KEY,
+        city TEXT NOT NULL,
+	address TEXT NOT NULL,
+	label TEXT,
+        is_central BOOLEAN NOT NULL
+);

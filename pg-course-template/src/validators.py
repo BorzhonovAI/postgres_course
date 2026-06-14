@@ -44,6 +44,24 @@ class PriceValidator(Validator):
             raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
 
 
+class QuantityValidator(Validator):
+    def validate(self, document):
+        text = document.text.strip()
+        if text:
+            try:
+                quantity = int(text)
+                if quantity <= 0:
+                    raise ValidationError(
+                        message="Количество должно быть больше 0", cursor_position=len(text)
+                    )
+            except ValueError as e:
+                raise ValidationError(
+                    message="Введите число", cursor_position=len(text)
+                ) from e
+        else:
+            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+
+
 class NonEmptyValidator(Validator):
     def __init__(self, message="Поле не может быть пустым"):
         self.message = message
