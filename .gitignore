@@ -1,4 +1,5 @@
 /pg-course-template/logs/
+/pg-course-template/.venv/
 /pg-course-template/.idea/
 pg-course-template/src/__pycache__/
 pg-course-template/src/handlers/__pycache__/
