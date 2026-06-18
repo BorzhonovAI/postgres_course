@@ -8,3 +8,9 @@ CREATE TABLE auth.users (
 );
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+--для простоты пароли пользователей будут совпадать с паролями ролей
+insert into auth.users (username, password, role) VALUES
+('sal', crypt('sales', gen_salt('bf')), 'sales_manager');
+insert into auth.users (username, password, role) VALUES
+('cat', crypt('catalog', gen_salt('bf')), 'catalog_manager');
+
