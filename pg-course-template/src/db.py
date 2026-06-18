@@ -1,16 +1,14 @@
 from typing import Final
 
 import psycopg
+import os
 from psycopg import Connection
 
-DB_NAME: Final[str] = "inventorydb"
-# DB_NAME: Final[str] = "postgres"
-DB_USER: Final[str] = "app_user"
-# DB_USER: Final[str] = "postgres"
-DB_PASSWORD: Final[str] = "gfhjkm"
-# DB_PASSWORD: Final[str] = "1234567890"
-DB_HOST: Final[str] = "127.0.0.1"
-DB_PORT: Final[int] = 5432
+DB_NAME: Final[str] = os.environ["DB_NAME"]
+DB_USER: Final[str] = os.environ["DB_USER"]
+DB_PASSWORD: Final[str] = os.environ["DB_PASSWORD"]
+DB_HOST: Final[str] = os.environ["DB_HOST"]
+DB_PORT: Final[int] = int(os.environ["DB_PORT"])
 
 _CONN: Connection | None = None
 
