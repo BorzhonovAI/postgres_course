@@ -15,3 +15,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA "catalog" REVOKE SELECT ON TABLES FROM sales_
 
 REVOKE sales_manager FROM supervisor;
 REVOKE catalog_manager FROM supervisor;
+
+REVOKE USAGE ON SCHEMA auth FROM sales_manager, catalog_manager;
+REVOKE SELECT ON ALL TABLES in schema auth FROM sales_manager, catalog_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth REVOKE SELECT ON TABLES FROM sales_manager, catalog_manager;

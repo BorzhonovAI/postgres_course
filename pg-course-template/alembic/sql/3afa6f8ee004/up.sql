@@ -15,3 +15,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA "catalog" GRANT SELECT ON TABLES TO sales_man
 
 GRANT sales_manager TO supervisor;
 GRANT catalog_manager TO supervisor;
+
+GRANT USAGE ON SCHEMA auth TO sales_manager, catalog_manager;
+GRANT SELECT ON ALL TABLES in schema auth TO sales_manager, catalog_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO sales_manager, catalog_manager;
