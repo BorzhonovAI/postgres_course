@@ -4,6 +4,7 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ROLE_SALES_MANAGER
 from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
@@ -36,7 +37,8 @@ def _render_order(order: Order):
     console.print(panel)
 
 
-@command("list orders", "список всех заказов", CATEGORY_ORDERS)
+@command("list orders", "список всех заказов", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def list_orders() -> None:
     conn = get_conn()
     table = Table(title="Заказы", show_header=True, header_style="bold cyan")
@@ -63,7 +65,8 @@ def list_orders() -> None:
     console.print(table)
 
 
-@command("show order", "информация о заказе", CATEGORY_ORDERS)
+@command("show order", "информация о заказе", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def show_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -77,7 +80,8 @@ def show_order(_id: str) -> None:
     _render_order(order)
 
 
-@command("add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS)
+@command("add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def add_order() -> None:
     conn = get_conn()
 
@@ -106,7 +110,8 @@ def add_order() -> None:
     show_order(order_id)
 
 
-@command("edit order", "редактировать заказ", CATEGORY_ORDERS)
+@command("edit order", "редактировать заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def edit_order(_id: str) -> None:
     conn = get_conn()
 
@@ -139,7 +144,8 @@ def edit_order(_id: str) -> None:
     console.print(f"[green]Заказ #{_id} обновлен [/green]")
 
 
-@command("delete order", "удалить заказ", CATEGORY_ORDERS)
+@command("delete order", "удалить заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def delete_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -164,7 +170,8 @@ def delete_order(_id: str) -> None:
         console.print(f"[green]Заказ #{_id} удален [/green]")
 
 
-@command("publish order", "опубликовать заказ", CATEGORY_ORDERS)
+@command("publish order", "опубликовать заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def publish_order(_id: str) -> None:
     conn = get_conn()
 

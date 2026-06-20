@@ -4,11 +4,12 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
+from commands import command, CATEGORY_WAREHOUSES
 from console import console, render_error
 from db import get_conn
-from structures import Warehouse, Order
+from structures import Warehouse
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
-from commands import command, CATEGORY_WAREHOUSES
 
 cities = [
     "Москва",
@@ -92,7 +93,7 @@ def _render_warehouse(warehouse: Warehouse) -> None:
     console.print(panel)
 
 
-@command("list warehouses", "список всех складов", CATEGORY_WAREHOUSES)
+@command("list warehouses", "список всех складов", CATEGORY_WAREHOUSES, ALL_ROLES)
 def list_warehouses() -> None:
     conn = get_conn()
     table = Table(title="Склады", show_header=True, header_style="bold cyan")
@@ -118,7 +119,7 @@ def list_warehouses() -> None:
     console.print(table)
 
 
-@command("show warehouse", "информация о складе", CATEGORY_WAREHOUSES)
+@command("show warehouse", "информация о складе", CATEGORY_WAREHOUSES, ALL_ROLES)
 def show_warehouse(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Warehouse)) as cur:
@@ -145,7 +146,8 @@ def warehouses_empty() -> bool:
     return True if warehouses_count() == 0 else False
 
 
-@command("add warehouse", "добавить склад (интерактивно)", CATEGORY_WAREHOUSES)
+@command("add warehouse", "добавить склад (интерактивно)", CATEGORY_WAREHOUSES,
+         [ROLE_CATALOG_MANAGER])
 def add_warehouse() -> None:
     conn = get_conn()
     city = prompt("Город: ", validator=city_validator, completer=city_completer).strip()
@@ -171,7 +173,8 @@ def add_warehouse() -> None:
         console.print(f"[green]Склад в городе {city} добавлен [/green]")
 
 
-@command("edit warehouse", "редактировать склад", CATEGORY_WAREHOUSES)
+@command("edit warehouse", "редактировать склад", CATEGORY_WAREHOUSES,
+         [ROLE_CATALOG_MANAGER])
 def edit_warehouse(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Warehouse)) as cur:
@@ -217,7 +220,8 @@ def edit_warehouse(_id: str) -> None:
         console.print(f"[green]Склад в городе {city} обновлен [/green]")
 
 
-@command("delete warehouse", "удалить склад", CATEGORY_WAREHOUSES)
+@command("delete warehouse", "удалить склад", CATEGORY_WAREHOUSES,
+         [ROLE_CATALOG_MANAGER])
 def delete_warehouse(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Warehouse)) as cur:
@@ -252,7 +256,8 @@ def delete_warehouse(_id: str) -> None:
             console.print(f"[green]Склад в городе {warehouse.city} удален [/green]")
 
 
-@command("delete all warehouses", "удалить все категории товаров", CATEGORY_WAREHOUSES)
+@command("delete all warehouses", "удалить все категории товаров", CATEGORY_WAREHOUSES,
+         [ROLE_CATALOG_MANAGER])
 def delete_all_warehouses() -> None:
     conn = get_conn()
 
