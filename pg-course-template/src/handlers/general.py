@@ -46,26 +46,6 @@ def clear_screen() -> None:
     console.clear()
 
 
-@command("delete all",
-         "удалить все склады, товары и категории товаров",
-         CATEGORY_GENERAL,
-         ALL_ROLES)
-def delete_all() -> None:
-    conn = get_conn()
-
-    answer = (prompt
-        (
-        f"Вы собираетесь удалить все склады, товары и категории товаров. Вы уверены? (y/n, д/н): ",
-        validator=YesNoValidator()
-    ))
-
-    if YesNoValidator.is_yes(answer):
-        conn.execute("TRUNCATE TABLE catalog.warehouses")
-        conn.execute("TRUNCATE TABLE catalog.products")
-        conn.execute("TRUNCATE TABLE catalog.product_categories")
-        console.print(f"[green]Все склады, товары и категории товаров удалены [/green]")
-
-
 @command("exit", "выход", CATEGORY_GENERAL, ALL_ROLES)
 def exit_app() -> None:
     """Выход - ничего не делает, обрабатывается в main loop"""
