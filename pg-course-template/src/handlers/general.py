@@ -1,11 +1,8 @@
-from prompt_toolkit import prompt
 from rich.panel import Panel
 
 from auth import ALL_ROLES
-from validators import YesNoValidator
-from console import console
 from commands import get_commands, CATEGORIES, command, CATEGORY_GENERAL, Command
-from db import get_conn
+from console import console
 
 
 @command("help", "эта справка", CATEGORY_GENERAL, ALL_ROLES)
