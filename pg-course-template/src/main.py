@@ -1,7 +1,9 @@
+import argparse
 import logging
 
 from prompt_toolkit import PromptSession
 
+from auth import login, auth_user
 from console import console, render_error
 from db import connect, DB_USER, DB_NAME, close
 from setup import setup_logger
@@ -15,15 +17,24 @@ setup_logger(psycopg_log_level=logging.INFO)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Inventory Management System")
+    parser.add_argument("-u", "--username", help="Username for authentication")
+    parser.add_argument("-p", "--password", help="Password for authentication")
+    cli_args = parser.parse_args()
+
+    connect(None, None)  # connect with app_user to read auth.users
+
+    password = login(username=cli_args.username, password=cli_args.password)
     # Подключение к БД
-    connect()
+    user = auth_user()
+    connect(user.role, password)  # connect with auth role
     logging.info("App Started")
 
     # Вывод заголовка через rich
     console.print("\n[bold cyan]═══════════════════════════════════════[/bold cyan]")
     console.print("[bold cyan]   Inventory Management System[/bold cyan]")
     console.print("[bold cyan]═══════════════════════════════════════[/bold cyan]")
-    console.print(f"[dim]Подключено к БД: {DB_NAME} (user: {DB_USER})[/dim]\n")
+    console.print(f"[dim]Подключено к БД: {DB_NAME} (user: {user.username})[/dim]\n")
 
     # Создаём сессию prompt_toolkit с автодополнением команд.
     # https://python-prompt-toolkit.readthedocs.io/en/stable/pages/asking_for_input.html#the-promptsession-object

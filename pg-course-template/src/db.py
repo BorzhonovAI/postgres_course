@@ -13,12 +13,17 @@ DB_PORT: Final[int] = int(os.environ["DB_PORT"])
 _CONN: Connection | None = None
 
 
-def connect() -> None:
+def connect(role: str | None = None, password: str | None = None) -> None:
     global _CONN
+
+    if role is None and password is None:
+        role = DB_USER
+        password = DB_PASSWORD
+
     _CONN = psycopg.connect(
         dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
+        user=role,
+        password=password,
         host=DB_HOST,
         port=DB_PORT,
         autocommit=True,
