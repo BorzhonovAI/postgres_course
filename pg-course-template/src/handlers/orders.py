@@ -4,12 +4,13 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
-from auth import ROLE_SALES_MANAGER
+from auth import ROLE_SALES_MANAGER, auth_user
 from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
 from order_items import add_order_item
 from structures import Order
+from users import get_user
 from validators import YesNoValidator
 from warehouses import get_warehouse_full_address, get_warehouses
 
@@ -26,6 +27,8 @@ def _render_order(order: Order):
     table.add_row("Время создания", order.created_at.astimezone().isoformat(timespec='seconds'))
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
+    user = get_user(order.created_by_id)
+    table.add_row("Владелец", user.username)
 
     panel = Panel(
         table,
@@ -48,6 +51,7 @@ def list_orders() -> None:
     table.add_column("Суммарная стоимость", style="yellow", min_width=30)
     table.add_column("Время создания", style="magenta", min_width=15)
     table.add_column("Склад", style="red", min_width=15)
+    table.add_column("Владелец", style="magenta", min_width=15)
 
     with conn.cursor(row_factory=class_row(Order)) as cur:
         cur.execute("SELECT * FROM sales.orders")
@@ -55,12 +59,14 @@ def list_orders() -> None:
 
     for order in orders:
         address = get_warehouse_full_address(order.warehouse_id)
+        user = get_user(order.created_by_id)
         table.add_row(
             str(order.id),
             order.status,
             str(order.total_amount),
             order.created_at.astimezone().isoformat(timespec='seconds'),
             address if len(address) != 0 else "Неизвестно",
+            user.username
         )
     console.print(table)
 
@@ -93,10 +99,11 @@ def add_order() -> None:
         options=warehouses_options
     )
 
+    user = auth_user()
     with conn.transaction():
         order_id = conn.execute(
-            "INSERT INTO sales.orders (warehouse_id) VALUES (%s) RETURNING id",
-            (warehouse_id,),
+            "INSERT INTO sales.orders (warehouse_id, created_by_id) VALUES (%s, %s) RETURNING id",
+            (warehouse_id, user.id),
         ).fetchone()[0]
 
         answer = prompt(

@@ -27,7 +27,7 @@ def get_user(_id: int) -> User | None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(User)) as cur:
         cur.execute(
-            "SELECT id, username, role FROM auth.users WHERE id = '%s'",
+            "SELECT id, username, role FROM auth.users WHERE id = %s",
             (_id,)
         )
         user: User | None = cur.fetchone()
