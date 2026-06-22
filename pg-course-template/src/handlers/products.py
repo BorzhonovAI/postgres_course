@@ -4,6 +4,7 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
@@ -92,7 +93,7 @@ def _render_product(product: Product):  # pylint: disable=unused-argument
     console.print(panel)
 
 
-@command("list products", "список всех товаров", CATEGORY_PRODUCTS)
+@command("list products", "список всех товаров", CATEGORY_PRODUCTS, ALL_ROLES)
 def list_products() -> None:
     conn = get_conn()
     table = Table(title="Продукты", show_header=True, header_style="bold cyan")
@@ -118,7 +119,7 @@ def list_products() -> None:
     console.print(table)
 
 
-@command("show product", "информация о товаре", CATEGORY_PRODUCTS)
+@command("show product", "информация о товаре", CATEGORY_PRODUCTS, ALL_ROLES)
 def show_product(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -132,7 +133,8 @@ def show_product(_id: str) -> None:
     _render_product(product)
 
 
-@command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS)
+@command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS,
+         [ROLE_CATALOG_MANAGER])
 def add_product() -> None:
     conn = get_conn()
 
@@ -159,7 +161,8 @@ def add_product() -> None:
     console.print(f"[green]Товар {name} ({product.id}) добавлен [/green]")
 
 
-@command("edit product", "редактировать товар", CATEGORY_PRODUCTS)
+@command("edit product", "редактировать товар", CATEGORY_PRODUCTS,
+         [ROLE_CATALOG_MANAGER])
 def edit_product(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -197,7 +200,8 @@ def edit_product(_id: str) -> None:
     console.print(f"[green]Продукт ({name}) обновлен [/green]")
 
 
-@command("delete product", "удалить товар", CATEGORY_PRODUCTS)
+@command("delete product", "удалить товар", CATEGORY_PRODUCTS,
+         [ROLE_CATALOG_MANAGER])
 def delete_product(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -231,7 +235,8 @@ def products_count() -> int:
     return count[0]
 
 
-@command("delete all products", "удалить все товары", CATEGORY_PRODUCTS)
+@command("delete all products", "удалить все товары", CATEGORY_PRODUCTS,
+         [ROLE_CATALOG_MANAGER])
 def delete_all_products() -> None:
     conn = get_conn()
 

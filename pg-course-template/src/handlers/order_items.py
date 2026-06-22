@@ -7,6 +7,7 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ROLE_SALES_MANAGER
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
@@ -80,7 +81,10 @@ def is_product_in_order(order_items: list[OrderItem], product: Product) -> bool:
     return False
 
 
-@command("add order_item", "добавить товар к заказу (интерактивно)", CATEGORY_ORDER_ITEMS)
+@command("add order_item",
+         "добавить товар к заказу (интерактивно)",
+         CATEGORY_ORDER_ITEMS,
+         [ROLE_SALES_MANAGER])
 def add_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -134,7 +138,10 @@ def add_order_item(order_id: int) -> None:
         add_order_item(order_id)
 
 
-@command("edit order_item", "редактировать товар в заказе", CATEGORY_ORDER_ITEMS)
+@command("edit order_item",
+         "редактировать товар в заказе",
+         CATEGORY_ORDER_ITEMS,
+         [ROLE_SALES_MANAGER])
 def edit_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -181,7 +188,10 @@ def edit_order_item(order_id: int) -> None:
     console.print(f"[green]Товар {product.name} обновлен в заказе ({order_id})  [/green]")
 
 
-@command("delete order_item", "удалить товар из заказа", CATEGORY_ORDER_ITEMS)
+@command("delete order_item",
+         "удалить товар из заказа",
+         CATEGORY_ORDER_ITEMS,
+         [ROLE_SALES_MANAGER])
 def delete_order_item(order_id: int) -> None:
     conn = get_conn()
 

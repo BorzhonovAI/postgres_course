@@ -5,6 +5,7 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from console import console, render_error
 from db import get_conn
 from structures import ProductCategory
@@ -80,7 +81,9 @@ def _render_product_category(category: ProductCategory) -> None:
     console.print(panel)
 
 
-@command("list product_categories", "список всех категорий товаров", CATEGORY_PRODUCTS_CATEGORIES)
+@command("list product_categories",
+         "список всех категорий товаров",
+         CATEGORY_PRODUCTS_CATEGORIES, ALL_ROLES)
 def list_categories() -> None:
     conn = get_conn()
     table = Table(title="Категории товаров", show_header=True, header_style="bold cyan")
@@ -100,7 +103,9 @@ def list_categories() -> None:
     console.print(table)
 
 
-@command("show product_category", "информация о категории товара", CATEGORY_PRODUCTS_CATEGORIES)
+@command("show product_category",
+         "информация о категории товара",
+         CATEGORY_PRODUCTS_CATEGORIES, ALL_ROLES)
 def show_category(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
@@ -115,7 +120,9 @@ def show_category(_id: str) -> None:
 
 
 # serial даже после удаления элемента не уменьшается
-@command("add product_category", "добавить категорию товара (интерактивно)", CATEGORY_PRODUCTS_CATEGORIES)
+@command("add product_category",
+         "добавить категорию товара (интерактивно)",
+         CATEGORY_PRODUCTS_CATEGORIES, [ROLE_CATALOG_MANAGER])
 def add_category() -> None:
     conn = get_conn()
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
@@ -131,7 +138,9 @@ def add_category() -> None:
     console.print(f"[green]Категория {name} ({category.id}) добавлена [/green]")
 
 
-@command("edit product_category", "редактировать категорию товара", CATEGORY_PRODUCTS_CATEGORIES)
+@command("edit product_category",
+         "редактировать категорию товара",
+         CATEGORY_PRODUCTS_CATEGORIES, [ROLE_CATALOG_MANAGER])
 def edit_category(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
@@ -163,7 +172,9 @@ def products_count_by_category_id(_id: int) -> int:
     return count[0]
 
 
-@command("delete product_category", "удалить категорию товара", CATEGORY_PRODUCTS_CATEGORIES)
+@command("delete product_category",
+         "удалить категорию товара",
+         CATEGORY_PRODUCTS_CATEGORIES, [ROLE_CATALOG_MANAGER])
 def delete_category(_id: str) -> None:
     conn = get_conn()
 
@@ -195,7 +206,9 @@ def delete_category(_id: str) -> None:
         console.print(f"[green]Категория товара удалена [/green]")
 
 
-@command("delete all product_categories", "удалить все категории товаров", CATEGORY_PRODUCTS_CATEGORIES)
+@command("delete all product_categories",
+         "удалить все категории товаров",
+         CATEGORY_PRODUCTS_CATEGORIES, [ROLE_CATALOG_MANAGER])
 def delete_all_product_categories() -> None:
     conn = get_conn()
 

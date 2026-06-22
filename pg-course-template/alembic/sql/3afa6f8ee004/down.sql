@@ -1,0 +1,22 @@
+ALTER DEFAULT PRIVILEGES IN SCHEMA "catalog" REVOKE SELECT ON TABLES FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth REVOKE SELECT ON TABLES FROM PUBLIC;
+
+REVOKE ALL ON SCHEMA "catalog" FROM catalog_manager;
+REVOKE ALL ON ALL TABLES IN SCHEMA "catalog" FROM catalog_manager;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA "catalog" FROM catalog_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA "catalog" REVOKE ALL ON TABLES FROM catalog_manager;
+
+REVOKE ALL ON SCHEMA sales FROM sales_manager;
+REVOKE ALL ON ALL TABLES IN SCHEMA sales FROM sales_manager;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA sales FROM sales_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA sales REVOKE ALL ON TABLES FROM sales_manager;
+REVOKE USAGE ON SCHEMA "catalog" FROM sales_manager;
+REVOKE SELECT ON ALL TABLES in schema "catalog" FROM sales_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA "catalog" REVOKE SELECT ON TABLES FROM sales_manager;
+
+REVOKE sales_manager FROM supervisor;
+REVOKE catalog_manager FROM supervisor;
+
+REVOKE USAGE ON SCHEMA auth FROM sales_manager, catalog_manager;
+REVOKE SELECT ON ALL TABLES in schema auth FROM sales_manager, catalog_manager;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth REVOKE SELECT ON TABLES FROM sales_manager, catalog_manager;

@@ -1,13 +1,11 @@
-from prompt_toolkit import prompt
 from rich.panel import Panel
 
-from validators import YesNoValidator
-from console import console
+from auth import ALL_ROLES
 from commands import get_commands, CATEGORIES, command, CATEGORY_GENERAL, Command
-from db import get_conn
+from console import console
 
 
-@command("help", "эта справка", CATEGORY_GENERAL)
+@command("help", "эта справка", CATEGORY_GENERAL, ALL_ROLES)
 def show_help() -> None:
     """Справка - вывод через rich"""
 
@@ -39,29 +37,12 @@ def show_help() -> None:
     console.print()
 
 
-@command("clear", "очистить экран", CATEGORY_GENERAL)
+@command("clear", "очистить экран", CATEGORY_GENERAL, ALL_ROLES)
 def clear_screen() -> None:
     """Очистить экран"""
     console.clear()
 
 
-@command("delete all", "удалить все склады, товары и категории товаров", CATEGORY_GENERAL)
-def delete_all() -> None:
-    conn = get_conn()
-
-    answer = (prompt
-        (
-        f"Вы собираетесь удалить все склады, товары и категории товаров. Вы уверены? (y/n, д/н): ",
-        validator=YesNoValidator()
-    ))
-
-    if YesNoValidator.is_yes(answer):
-        conn.execute("TRUNCATE TABLE catalog.warehouses")
-        conn.execute("TRUNCATE TABLE catalog.products")
-        conn.execute("TRUNCATE TABLE catalog.product_categories")
-        console.print(f"[green]Все склады, товары и категории товаров удалены [/green]")
-
-
-@command("exit", "выход", CATEGORY_GENERAL)
+@command("exit", "выход", CATEGORY_GENERAL, ALL_ROLES)
 def exit_app() -> None:
     """Выход - ничего не делает, обрабатывается в main loop"""

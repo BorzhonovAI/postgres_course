@@ -18,6 +18,7 @@ class Order:
     total_amount: Decimal
     created_at: datetime
     warehouse_id: int
+    created_by_id: int
 
 
 @dataclass

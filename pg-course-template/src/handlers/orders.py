@@ -4,11 +4,13 @@ from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
+from auth import ROLE_SALES_MANAGER, auth_user
 from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
 from order_items import add_order_item
 from structures import Order
+from users import get_user
 from validators import YesNoValidator
 from warehouses import get_warehouse_full_address, get_warehouses
 
@@ -25,6 +27,8 @@ def _render_order(order: Order):
     table.add_row("Время создания", order.created_at.astimezone().isoformat(timespec='seconds'))
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
+    user = get_user(order.created_by_id)
+    table.add_row("Владелец", user.username)
 
     panel = Panel(
         table,
@@ -36,7 +40,8 @@ def _render_order(order: Order):
     console.print(panel)
 
 
-@command("list orders", "список всех заказов", CATEGORY_ORDERS)
+@command("list orders", "список всех заказов", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def list_orders() -> None:
     conn = get_conn()
     table = Table(title="Заказы", show_header=True, header_style="bold cyan")
@@ -46,6 +51,7 @@ def list_orders() -> None:
     table.add_column("Суммарная стоимость", style="yellow", min_width=30)
     table.add_column("Время создания", style="magenta", min_width=15)
     table.add_column("Склад", style="red", min_width=15)
+    table.add_column("Владелец", style="magenta", min_width=15)
 
     with conn.cursor(row_factory=class_row(Order)) as cur:
         cur.execute("SELECT * FROM sales.orders")
@@ -53,17 +59,20 @@ def list_orders() -> None:
 
     for order in orders:
         address = get_warehouse_full_address(order.warehouse_id)
+        user = get_user(order.created_by_id)
         table.add_row(
             str(order.id),
             order.status,
             str(order.total_amount),
             order.created_at.astimezone().isoformat(timespec='seconds'),
             address if len(address) != 0 else "Неизвестно",
+            user.username
         )
     console.print(table)
 
 
-@command("show order", "информация о заказе", CATEGORY_ORDERS)
+@command("show order", "информация о заказе", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def show_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -77,7 +86,8 @@ def show_order(_id: str) -> None:
     _render_order(order)
 
 
-@command("add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS)
+@command("add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def add_order() -> None:
     conn = get_conn()
 
@@ -89,10 +99,11 @@ def add_order() -> None:
         options=warehouses_options
     )
 
+    user = auth_user()
     with conn.transaction():
         order_id = conn.execute(
-            "INSERT INTO sales.orders (warehouse_id) VALUES (%s) RETURNING id",
-            (warehouse_id,),
+            "INSERT INTO sales.orders (warehouse_id, created_by_id) VALUES (%s, %s) RETURNING id",
+            (warehouse_id, user.id),
         ).fetchone()[0]
 
         answer = prompt(
@@ -106,7 +117,8 @@ def add_order() -> None:
     show_order(order_id)
 
 
-@command("edit order", "редактировать заказ", CATEGORY_ORDERS)
+@command("edit order", "редактировать заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def edit_order(_id: str) -> None:
     conn = get_conn()
 
@@ -139,7 +151,8 @@ def edit_order(_id: str) -> None:
     console.print(f"[green]Заказ #{_id} обновлен [/green]")
 
 
-@command("delete order", "удалить заказ", CATEGORY_ORDERS)
+@command("delete order", "удалить заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def delete_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -164,7 +177,8 @@ def delete_order(_id: str) -> None:
         console.print(f"[green]Заказ #{_id} удален [/green]")
 
 
-@command("publish order", "опубликовать заказ", CATEGORY_ORDERS)
+@command("publish order", "опубликовать заказ", CATEGORY_ORDERS,
+         [ROLE_SALES_MANAGER])
 def publish_order(_id: str) -> None:
     conn = get_conn()
 
