@@ -12,7 +12,7 @@ from order_items import add_order_item
 from structures import Order
 from users import get_user
 from validators import YesNoValidator
-from warehouses import get_warehouse_full_address, get_warehouses
+from warehouses import get_warehouse_full_address, get_warehouses, get_city_name
 
 
 def _render_order(order: Order):
@@ -92,7 +92,7 @@ def add_order() -> None:
     conn = get_conn()
 
     warehouses = get_warehouses()
-    warehouses_options = [(w.id, f"г. {w.city}, {w.address}") for w in warehouses]
+    warehouses_options = [(w.id, f"г. {get_city_name(w.city_id)}, {w.address}") for w in warehouses]
 
     warehouse_id = choice(
         message="Выберите склад:",
@@ -135,7 +135,7 @@ def edit_order(_id: str) -> None:
         return
 
     warehouses = get_warehouses()
-    warehouses_options = [(w.id, f"г. {w.city}, {w.address}") for w in warehouses]
+    warehouses_options = [(w.id, f"г. {get_city_name(w.city_id)}, {w.address}") for w in warehouses]
 
     warehouse_id = choice(
         message="Выберите склад:",

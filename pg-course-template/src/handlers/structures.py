@@ -39,7 +39,13 @@ class Product:
 @dataclass
 class Warehouse:
     id: int
-    city: str
+    city_id: int
     address: str
     label: str | None
     is_central: bool
+
+
+@dataclass
+class City:
+    id: int
+    name: str
