@@ -1,4 +1,4 @@
-"""5_grant_worker_permissions
+"""[5]: grant worker permissions
 
 Revision ID: 198b888299a2
 Revises: a7f6ada2b95c

@@ -1,4 +1,4 @@
-"""5_add_processing_by_id_to_orders
+"""[5]: add processing_by_id column to orders
 
 Revision ID: a7f6ada2b95c
 Revises: 9ac53cb77c24

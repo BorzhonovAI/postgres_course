@@ -1,4 +1,4 @@
-"""5_add_missing_inventory_tables
+"""[5]: add missing inventory tables
 
 Revision ID: 9ac53cb77c24
 Revises: e34dcb9ce90d
