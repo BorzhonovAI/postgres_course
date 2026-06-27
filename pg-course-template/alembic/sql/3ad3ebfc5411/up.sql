@@ -24,12 +24,14 @@ CREATE TABLE inventory.stock (
 
 CREATE TABLE inventory.deliveries (
 	id serial NOT NULL,
+	order_id int NOT NULL,
 	status text DEFAULT 'planned' NOT NULL,
 	created_at timestamp DEFAULT current_timestamp NOT NULL,
 	shipped_at timestamp NULL,
 	created_by_id int NOT NULL,
 	CONSTRAINT deliveries_pk PRIMARY KEY (id),
 	CONSTRAINT deliveries_status_check CHECK (status in ('planned', 'shipping', 'shipped')),
+	CONSTRAINT deliveries_order_fk FOREIGN KEY (order_id) REFERENCES sales.orders(id),
 	CONSTRAINT deliveries_created_by_fk FOREIGN KEY (created_by_id) REFERENCES auth.users(id)
 );
 
