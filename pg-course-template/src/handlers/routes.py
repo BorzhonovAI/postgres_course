@@ -9,7 +9,12 @@ from commands import command, CATEGORY_ROUTES
 from console import console, render_error
 from db import get_conn
 from structures import Route
-from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator, PriceValidator
+from validators import (
+    ChoiceValidator,
+    NonEmptyValidator,
+    YesNoValidator,
+    PriceValidator,
+)
 
 
 def _get_city_options() -> list[tuple[int, str]]:
@@ -110,7 +115,8 @@ def show_route() -> None:
 
     route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
     route_validator = ChoiceValidator(
-        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
+        route_options,
+        message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения.",
     )
     selected_str = prompt(
         "Выберите маршрут: ", validator=route_validator, completer=route_completer
@@ -149,33 +155,60 @@ def add_route() -> None:
         existing_routes = set(cur.fetchall())
 
     city_names = [c[1] for c in cities]
-    city_map = {c[1]: c[0] for c in cities}
+    name_to_id = {c[1]: c[0] for c in cities}
+    id_to_name = {c[0]: c[1] for c in cities}
 
-    # Pick from city — dropdown with Tab auto-completion
-    from_completer = WordCompleter(city_names, ignore_case=True, sentence=True)
+    # Calculate which from-cities already have all possible routes covered
+    # so we can hide them from the departure dropdown
+    total_count = len(city_names)
+    from_coverage = {}  # from_id -> set of to_ids
+    for from_id, to_id in existing_routes:
+        from_coverage.setdefault(from_id, set()).add(to_id)
+    exhausted_from_ids = {
+        fid for fid, tids in from_coverage.items() if len(tids) == total_count - 1
+    }
+
+    # Pick from city — exclude cities that already have all routes covered
+    from_candidates = [
+        name for name in city_names if name_to_id[name] not in exhausted_from_ids
+    ]
+
+    if not from_candidates:
+        render_error(
+            "Все возможные маршруты уже существуют. "
+            "Используйте «edit route» для изменения или «delete route» для удаления."
+        )
+        return
+
+    from_completer = WordCompleter(from_candidates, ignore_case=True, sentence=True)
     from_validator = ChoiceValidator(
-        city_names, message="Город должен быть из списка. Используйте Tab для автодополнения."
+        from_candidates,
+        message="Город должен быть из списка. Используйте Tab для автодополнения.",
     )
     from_name = prompt(
         "Город отправления: ", validator=from_validator, completer=from_completer
     ).strip()
 
-    # Pick to city — exclude same city; validate pair not already routed
-    to_candidates = [name for name in city_names if name != from_name]
+    # Pick to city — exclude same city AND cities that already have a route from here
+    from_city_id = name_to_id[from_name]
+    existing_destinations = {
+        to_id for (from_id, to_id) in existing_routes if from_id == from_city_id
+    }
+    excluded_names = {id_to_name[cid] for cid in existing_destinations}
+    to_candidates = [
+        name for name in city_names if name != from_name and name not in excluded_names
+    ]
+
     to_completer = WordCompleter(to_candidates, ignore_case=True, sentence=True)
     to_validator = ChoiceValidator(
-        to_candidates, message="Город должен быть из списка. Используйте Tab для автодополнения."
+        to_candidates,
+        message="Город должен быть из списка. Используйте Tab для автодополнения.",
     )
     to_name = prompt(
         "Город назначения: ", validator=to_validator, completer=to_completer
     ).strip()
 
-    from_city_id = city_map[from_name]
-    to_city_id = city_map[to_name]
-
-    if (from_city_id, to_city_id) in existing_routes:
-        render_error(f"Маршрут {from_name} → {to_name} уже существует")
-        return
+    to_city_id = name_to_id[to_name]
 
     duration_str = prompt(
         "Длительность (MM:SS): ", validator=NonEmptyValidator()
@@ -216,7 +249,8 @@ def edit_route() -> None:
 
     route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
     route_validator = ChoiceValidator(
-        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
+        route_options,
+        message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения.",
     )
     selected_str = prompt(
         "Выберите маршрут для редактирования: ",
@@ -270,9 +304,7 @@ def edit_route() -> None:
         (total_seconds, threshold, from_city_id, to_city_id),
     )
 
-    console.print(
-        f"[green]Маршрут {from_name} → {to_name} обновлен [/green]"
-    )
+    console.print(f"[green]Маршрут {from_name} → {to_name} обновлен [/green]")
 
 
 @command("delete route", "удалить маршрут", CATEGORY_ROUTES, [ROLE_INVENTORY_MANAGER])
@@ -289,7 +321,8 @@ def delete_route() -> None:
 
     route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
     route_validator = ChoiceValidator(
-        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
+        route_options,
+        message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения.",
     )
     selected_str = prompt(
         "Выберите маршрут для удаления: ",
