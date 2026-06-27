@@ -22,7 +22,7 @@ CREATE TABLE inventory.delivery_items (
     status text DEFAULT 'planned' NOT NULL,
     CONSTRAINT delivery_items_pk PRIMARY KEY (id),
     CONSTRAINT delivery_items_quantity_check CHECK (quantity >= 0),
-    CONSTRAINT delivery_items_status_check CHECK (status IN ('planned', 'shipping', 'shipped')),
+    CONSTRAINT delivery_items_status_check CHECK (status IN ('planned', 'shipped')),
     CONSTRAINT delivery_items_delivery_fk FOREIGN KEY (delivery_id) REFERENCES inventory.deliveries(id),
     CONSTRAINT delivery_items_order_fk FOREIGN KEY (order_id) REFERENCES sales.orders(id),
     CONSTRAINT delivery_items_product_fk FOREIGN KEY (product_id) REFERENCES "catalog".products(id)
