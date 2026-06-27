@@ -1,8 +1,8 @@
-"""[5]: add schema inventory and all tables
+"""[5]: add cities, inventory schema and all tables
 
-Revision ID: 3ad3ebfc5411
-Revises: e34dcb9ce90d
-Create Date: 2026-06-23 22:28:00.230546
+Revision ID: 0cec3b4e0cf0
+Revises: 01e6fb5c903e
+Create Date: 2026-06-27 21:07:21.655248
 
 """
 from typing import Sequence, Union
@@ -10,9 +10,10 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+
 # revision identifiers, used by Alembic.
-revision: str = '3ad3ebfc5411'
-down_revision: Union[str, None] = 'e1e6ad3fb326'
+revision: str = '0cec3b4e0cf0'
+down_revision: Union[str, None] = '01e6fb5c903e'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
