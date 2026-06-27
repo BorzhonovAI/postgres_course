@@ -1,6 +1,6 @@
 from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import choice
-from psycopg.rows import class_row, scalar_row
+from prompt_toolkit.completion import WordCompleter
+from psycopg.rows import class_row
 from rich.panel import Panel
 from rich.table import Table
 
@@ -9,24 +9,40 @@ from commands import command, CATEGORY_ROUTES
 from console import console, render_error
 from db import get_conn
 from structures import Route
-from validators import NonEmptyValidator, YesNoValidator
+from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator, PriceValidator
 
 
 def _get_city_options() -> list[tuple[int, str]]:
     """Return list of (city_id, city_name) for use in choice prompts."""
     conn = get_conn()
-    with conn.cursor(row_factory=scalar_row) as cur:
+    with conn.cursor() as cur:
         cur.execute("SELECT id, name FROM catalog.cities ORDER BY id")
         rows = cur.fetchall()
     return [(row[0], row[1]) for row in rows]
 
 
+def _get_route_options():
+    """Return (display_strings, route_map) for dropdown route selection."""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT r.from_city_id, r.to_city_id, c_from.name, c_to.name
+            FROM inventory.routes r
+            JOIN catalog.cities c_from ON r.from_city_id = c_from.id
+            JOIN catalog.cities c_to ON r.to_city_id = c_to.id
+            ORDER BY r.from_city_id, r.to_city_id
+        """)
+        routes = cur.fetchall()
+    display_strings = [f"{row[2]} → {row[3]}" for row in routes]
+    route_map = {ds: (row[0], row[1]) for ds, row in zip(display_strings, routes)}
+    return display_strings, route_map
+
+
 def _format_duration(td) -> str:
-    """Format timedelta as HH:MM:SS."""
+    """Format timedelta as MM:SS."""
     total_seconds = int(td.total_seconds())
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    minutes, seconds = divmod(total_seconds, 60)
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def _render_route(route: Route, from_name: str, to_name: str) -> None:
@@ -58,7 +74,7 @@ def list_routes() -> None:
     table.add_column("Длительность", style="magenta", min_width=15)
     table.add_column("Мин. стоимость", style="red", min_width=15)
 
-    with conn.cursor(row_factory=scalar_row) as cur:
+    with conn.cursor() as cur:
         cur.execute("""
             SELECT r.duration, r.total_threshold, c_from.name, c_to.name
             FROM inventory.routes r
@@ -84,30 +100,23 @@ def list_routes() -> None:
 def show_route() -> None:
     conn = get_conn()
     cities = _get_city_options()
+    city_map = {c[0]: c[1] for c in cities}
 
-    # Get existing routes to pick from
-    with conn.cursor(row_factory=scalar_row) as cur:
-        cur.execute("""
-            SELECT r.from_city_id, r.to_city_id, c_from.name, c_to.name
-            FROM inventory.routes r
-            JOIN catalog.cities c_from ON r.from_city_id = c_from.id
-            JOIN catalog.cities c_to ON r.to_city_id = c_to.id
-            ORDER BY r.from_city_id, r.to_city_id
-        """)
-        routes = cur.fetchall()
+    route_options, route_map = _get_route_options()
 
-    if not routes:
+    if not route_options:
         render_error("Маршруты не найдены")
         return
 
-    route_options = [(idx, f"{row[2]} → {row[3]}") for idx, row in enumerate(routes)]
-
-    selected = choice(
-        message="Выберите маршрут:",
-        options=route_options,
+    route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
+    route_validator = ChoiceValidator(
+        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
     )
+    selected_str = prompt(
+        "Выберите маршрут: ", validator=route_validator, completer=route_completer
+    ).strip()
 
-    from_city_id, to_city_id = routes[selected][0], routes[selected][1]
+    from_city_id, to_city_id = route_map[selected_str]
 
     with conn.cursor(row_factory=class_row(Route)) as cur:
         cur.execute(
@@ -124,7 +133,6 @@ def show_route() -> None:
         render_error("Маршрут не найден")
         return
 
-    city_map = {c[0]: c[1] for c in cities}
     _render_route(route, city_map.get(from_city_id, "?"), city_map.get(to_city_id, "?"))
 
 
@@ -133,63 +141,50 @@ def add_route() -> None:
     conn = get_conn()
     cities = _get_city_options()
 
-    # Find cities already used in routes
-    with conn.cursor(row_factory=scalar_row) as cur:
+    # Find already existing routes
+    with conn.cursor() as cur:
         cur.execute("""
             SELECT from_city_id, to_city_id FROM inventory.routes ORDER BY from_city_id, to_city_id
         """)
         existing_routes = set(cur.fetchall())
 
-    # Show available city pairs not yet routed
-    available_pairs = [
-        (f"{c_from[1]}", f"{c_to[1]}")
-        for c_from in cities
-        for c_to in cities
-        if c_from[0] != c_to[0] and (c_from[0], c_to[0]) not in existing_routes
-    ]
-
-    if not available_pairs:
-        render_error("Все возможные маршруты уже добавлены")
-        return
-
-    # Pick from city
-    from_city_names = [name for name, _ in available_pairs]
-    from_choice_items = list(set(from_city_names))
-    from_choice_items.sort()
-    from_options = [(i, name) for i, name in enumerate(from_choice_items)]
-
-    from_selected = choice(
-        message="Город отправления:",
-        options=from_options,
-    )
-    from_name = from_choice_items[from_selected]
-
-    # Pick to city (exclude same city and already routed pairs)
-    to_options_filtered = [
-        name for name, to_name in available_pairs if name == from_name
-    ]
-    to_options = [(i, name) for i, name in enumerate(to_options_filtered)]
-
-    to_selected = choice(
-        message="Город назначения:",
-        options=to_options,
-    )
-    to_name = to_options_filtered[to_selected]
-
+    city_names = [c[1] for c in cities]
     city_map = {c[1]: c[0] for c in cities}
+
+    # Pick from city — dropdown with Tab auto-completion
+    from_completer = WordCompleter(city_names, ignore_case=True, sentence=True)
+    from_validator = ChoiceValidator(
+        city_names, message="Город должен быть из списка. Используйте Tab для автодополнения."
+    )
+    from_name = prompt(
+        "Город отправления: ", validator=from_validator, completer=from_completer
+    ).strip()
+
+    # Pick to city — exclude same city; validate pair not already routed
+    to_candidates = [name for name in city_names if name != from_name]
+    to_completer = WordCompleter(to_candidates, ignore_case=True, sentence=True)
+    to_validator = ChoiceValidator(
+        to_candidates, message="Город должен быть из списка. Используйте Tab для автодополнения."
+    )
+    to_name = prompt(
+        "Город назначения: ", validator=to_validator, completer=to_completer
+    ).strip()
+
     from_city_id = city_map[from_name]
     to_city_id = city_map[to_name]
 
+    if (from_city_id, to_city_id) in existing_routes:
+        render_error(f"Маршрут {from_name} → {to_name} уже существует")
+        return
+
     duration_str = prompt(
-        "Длительность (HH:MM:SS): ", validator=NonEmptyValidator()
+        "Длительность (MM:SS): ", validator=NonEmptyValidator()
     ).strip()
     parts = list(map(int, duration_str.split(":")))
-    if len(parts) == 3:
-        total_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-    elif len(parts) == 2:
+    if len(parts) == 2:
         total_seconds = parts[0] * 60 + parts[1]
     else:
-        render_error("Неверный формат длительности. Используйте HH:MM:SS или MM:SS")
+        render_error("Неверный формат длительности. Используйте MM:SS")
         return
 
     threshold = prompt(
@@ -198,7 +193,7 @@ def add_route() -> None:
 
     conn.execute(
         """INSERT INTO inventory.routes (from_city_id, to_city_id, duration, total_threshold)
-           VALUES (%s, %s, INTERVAL '%s seconds', %s)""",
+           VALUES (%s, %s, %s * INTERVAL '1 second', %s)""",
         (from_city_id, to_city_id, total_seconds, threshold),
     )
 
@@ -213,30 +208,23 @@ def edit_route() -> None:
     cities = _get_city_options()
     city_map = {c[0]: c[1] for c in cities}
 
-    with conn.cursor(row_factory=scalar_row) as cur:
-        cur.execute("""
-            SELECT r.from_city_id, r.to_city_id, c_from.name, c_to.name
-            FROM inventory.routes r
-            JOIN catalog.cities c_from ON r.from_city_id = c_from.id
-            JOIN catalog.cities c_to ON r.to_city_id = c_to.id
-            ORDER BY r.from_city_id, r.to_city_id
-        """)
-        routes = cur.fetchall()
+    route_options, route_map = _get_route_options()
 
-    if not routes:
+    if not route_options:
         render_error("Маршруты не найдены")
         return
 
-    route_options = [(idx, f"{row[2]} → {row[3]}") for idx, row in enumerate(routes)]
-
-    selected = choice(
-        message="Выберите маршрут для редактирования:",
-        options=route_options,
+    route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
+    route_validator = ChoiceValidator(
+        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
     )
+    selected_str = prompt(
+        "Выберите маршрут для редактирования: ",
+        validator=route_validator,
+        completer=route_completer,
+    ).strip()
 
-    from_city_id, to_city_id = routes[selected][0], routes[selected][1]
-    from_name = city_map.get(from_city_id, "?")
-    to_name = city_map.get(to_city_id, "?")
+    from_city_id, to_city_id = route_map[selected_str]
 
     # Get current values
     with conn.cursor(row_factory=class_row(Route)) as cur:
@@ -254,51 +242,36 @@ def edit_route() -> None:
         render_error("Маршрут не найден")
         return
 
-    # Edit from city
-    from_options = [(c[0], c[1]) for c in cities if c[0] != to_city_id]
-    new_from_id = choice(
-        message="Город отправления:",
-        options=from_options,
-        default=route.from_city_id,
-    )
-
-    # Edit to city
-    to_options = [(c[0], c[1]) for c in cities if c[0] != new_from_id]
-    new_to_id = choice(
-        message="Город назначения:",
-        options=to_options,
-        default=route.to_city_id,
-    )
+    from_name = city_map.get(from_city_id, "?")
+    to_name = city_map.get(to_city_id, "?")
 
     duration_str = prompt(
-        "Длительность (HH:MM:SS): ",
+        "Длительность (MM:SS): ",
         default=_format_duration(route.duration),
         validator=NonEmptyValidator(),
     ).strip()
     parts = list(map(int, duration_str.split(":")))
-    if len(parts) == 3:
-        total_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-    elif len(parts) == 2:
+    if len(parts) == 2:
         total_seconds = parts[0] * 60 + parts[1]
     else:
-        render_error("Неверный формат длительности. Используйте HH:MM:SS или MM:SS")
+        render_error("Неверный формат длительности. Используйте MM:SS")
         return
 
     threshold = prompt(
         "Минимальная стоимость перемещения: ",
         default=str(route.total_threshold),
-        validator=NonEmptyValidator(),
+        validator=PriceValidator(),
     ).strip()
 
     conn.execute(
         """UPDATE inventory.routes
-           SET from_city_id = %s, to_city_id = %s, duration = INTERVAL '%s seconds', total_threshold = %s
+           SET duration = %s * INTERVAL '1 second', total_threshold = %s
            WHERE from_city_id = %s AND to_city_id = %s""",
-        (new_from_id, new_to_id, total_seconds, threshold, from_city_id, to_city_id),
+        (total_seconds, threshold, from_city_id, to_city_id),
     )
 
     console.print(
-        f"[green]Маршрут {city_map.get(new_from_id)} → {city_map.get(new_to_id)} обновлен [/green]"
+        f"[green]Маршрут {from_name} → {to_name} обновлен [/green]"
     )
 
 
@@ -308,28 +281,23 @@ def delete_route() -> None:
     cities = _get_city_options()
     city_map = {c[0]: c[1] for c in cities}
 
-    with conn.cursor(row_factory=scalar_row) as cur:
-        cur.execute("""
-            SELECT r.from_city_id, r.to_city_id, c_from.name, c_to.name
-            FROM inventory.routes r
-            JOIN catalog.cities c_from ON r.from_city_id = c_from.id
-            JOIN catalog.cities c_to ON r.to_city_id = c_to.id
-            ORDER BY r.from_city_id, r.to_city_id
-        """)
-        routes = cur.fetchall()
+    route_options, route_map = _get_route_options()
 
-    if not routes:
+    if not route_options:
         render_error("Маршруты не найдены")
         return
 
-    route_options = [(idx, f"{row[2]} → {row[3]}") for idx, row in enumerate(routes)]
-
-    selected = choice(
-        message="Выберите маршрут для удаления:",
-        options=route_options,
+    route_completer = WordCompleter(route_options, ignore_case=True, sentence=True)
+    route_validator = ChoiceValidator(
+        route_options, message="Пожалуйста, выберите маршрут из списка. Используйте Tab для автодополнения."
     )
+    selected_str = prompt(
+        "Выберите маршрут для удаления: ",
+        validator=route_validator,
+        completer=route_completer,
+    ).strip()
 
-    from_city_id, to_city_id = routes[selected][0], routes[selected][1]
+    from_city_id, to_city_id = route_map[selected_str]
     from_name = city_map.get(from_city_id, "?")
     to_name = city_map.get(to_city_id, "?")
 
