@@ -10,14 +10,12 @@ from console import console, render_error
 from db import get_conn
 from .order_items import add_order_item
 from .structures import Order
-
-STATUS_NEW = "new"
 from users import get_user
 from validators import YesNoValidator
 from .warehouses import get_warehouse_full_address, get_warehouses, get_city_name
 
 
-def _render_order(order: Order) -> None:
+def _render_order(order: Order):
     table = Table(show_header=False, box=None, padding=(0, 2))
 
     table.add_column("Поле", style="bold cyan", width=20)
@@ -32,7 +30,7 @@ def _render_order(order: Order) -> None:
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
     user = get_user(order.created_by_id)
-    table.add_row("Владелец", user.username if user else "Неизвестно")
+    table.add_row("Владелец", user.username)
     if order.processing_by_id is not None:
         proc_user = get_user(order.processing_by_id)
         table.add_row("Обработчик", proc_user.username if proc_user else "Неизвестно")
@@ -72,20 +70,20 @@ def list_orders() -> None:
             str(order.total_amount),
             order.created_at.astimezone().isoformat(timespec="seconds"),
             address if len(address) != 0 else "Неизвестно",
-            user.username if user else "Неизвестно",
+            user.username,
         )
     console.print(table)
 
 
 @command("show order", "информация о заказе", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
-def show_order(order_id: int) -> None:
+def show_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (order_id,))
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
         order: Order | None = cur.fetchone()
 
     if order is None:
-        render_error(f"Заказ с ID {order_id} не найден")
+        render_error(f"Заказ с ID {_id} не найден")
         return
 
     _render_order(order)
@@ -106,11 +104,10 @@ def add_order() -> None:
 
     user = auth_user()
     with conn.transaction():
-        result = conn.execute(
+        order_id = conn.execute(
             "INSERT INTO sales.orders (warehouse_id, created_by_id) VALUES (%s, %s) RETURNING id",
             (warehouse_id, user.id),
-        ).fetchone()
-        order_id: int = result[0] if result else 0
+        ).fetchone()[0]
 
         answer = prompt(
             "Желаете добавить товары к заказу? (y/n, д/н): ", validator=YesNoValidator()
@@ -123,21 +120,19 @@ def add_order() -> None:
 
 
 @command("edit order", "редактировать заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
-def edit_order(order_id: int) -> None:
+def edit_order(_id: str) -> None:
     conn = get_conn()
 
     with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (order_id,))
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
         order: Order | None = cur.fetchone()
 
     if order is None:
-        render_error(f"Заказ с ID {order_id} не найден")
+        render_error(f"Заказ с ID {_id} не найден")
         return
 
     if order.status != "unpublished":
-        render_error(
-            f"Заказ с ID {order_id} опубликован и не может быть отредактирован"
-        )
+        render_error(f"Заказ с ID {_id} опубликован и не может быть отредактирован")
         return
 
     warehouses = get_warehouses()
@@ -153,25 +148,25 @@ def edit_order(order_id: int) -> None:
 
     conn.execute(
         "UPDATE sales.orders SET warehouse_id = %s WHERE id = %s",
-        (warehouse_id, order_id),
+        (warehouse_id, _id),
     )
 
-    console.print(f"[green]Заказ #{order_id} обновлен [/green]")
+    console.print(f"[green]Заказ #{_id} обновлен [/green]")
 
 
 @command("delete order", "удалить заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
-def delete_order(order_id: int) -> None:
+def delete_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (order_id,))
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
         order: Order | None = cur.fetchone()
 
     if order is None:
-        render_error(f"Заказ с ID {order_id} не найден")
+        render_error(f"Заказ с ID {_id} не найден")
         return
 
     if order.status != "unpublished":
-        render_error(f"Заказ с ID {order_id} опубликован и не может быть удален")
+        render_error(f"Заказ с ID {_id} опубликован и не может быть удален")
         return
 
     _render_order(order)
@@ -179,30 +174,30 @@ def delete_order(order_id: int) -> None:
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
     if YesNoValidator.is_yes(answer):
-        conn.execute("DELETE FROM sales.orders WHERE id = %s", (order_id,))
+        conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
 
-        console.print(f"[green]Заказ #{order_id} удален [/green]")
+        console.print(f"[green]Заказ #{_id} удален [/green]")
 
 
 @command("publish order", "опубликовать заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
-def publish_order(order_id: int) -> None:
+def publish_order(_id: str) -> None:
     conn = get_conn()
 
     with conn.cursor(row_factory=class_row(Order)) as cur:
-        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (order_id,))
+        cur.execute("SELECT * FROM sales.orders WHERE id = %s", (_id,))
         order: Order | None = cur.fetchone()
 
     if order is None:
-        render_error(f"Заказ с ID {order_id} не найден")
+        render_error(f"Заказ с ID {_id} не найден")
         return
 
     if order.status != "unpublished":
-        render_error(f"Заказ с ID {order_id}  уже опубликован")
+        render_error(f"Заказ с ID {_id}  уже опубликован")
         return
 
     conn.execute(
         "UPDATE sales.orders SET status = %s WHERE id = %s",
-        (STATUS_NEW, order_id),
+        ("new", _id),
     )
 
-    console.print(f"[green]Заказ #{order_id} опубликован [/green]")
+    console.print(f"[green]Заказ #{_id} опубликован [/green]")

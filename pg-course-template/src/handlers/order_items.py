@@ -121,33 +121,20 @@ def add_order_item(order_id: int) -> None:
         completer=product_name_completer,
     ).strip()
     sku = get_sku(product_name_with_sku)
-    if sku is None:
-        render_error("Не удалось извлечь SKU из имени товара")
-        return
-    product = get_product_by_sku(sku)
-    if product is None:
-        render_error(f"Товар с SKU '{sku}' не найден")
-        return
+    product: Product = get_product_by_sku(sku)
 
     quantity = prompt("Количество: ", validator=QuantityValidator()).strip()
 
     with conn.transaction():
         with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-            item_result = cur.execute(
-                """INSERT INTO sales.order_items (order_id, product_id, quantity, price)
+            item: OrderItem = cur.execute(
+                """INSERT INTO sales.order_items (order_id, product_id, quantity, price) 
                 VALUES (%s, %s, %s, %s) RETURNING *""",
                 (order_id, product.id, quantity, product.price),
             ).fetchone()
 
-        if item_result is None:
-            render_error("Ошибка при добавлении товара в заказ")
-            return
-
-        order = get_order_by_id(order_id)
-        if order is None:
-            render_error(f"Нет заказа с ID {order_id}")
-            return
-        total_amount = order.total_amount + item_result.quantity * item_result.price
+        order: Order = get_order_by_id(order_id)
+        total_amount = order.total_amount + item.quantity * item.price
         conn.execute(
             "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
             (total_amount, order_id),
@@ -182,38 +169,23 @@ def edit_order_item(order_id: int) -> None:
         render_error(f"В заказе с ID {order_id} нет товаров")
         return
 
-    products_with_name: list[tuple[int, str]] = []
-    for item in items:
-        product = get_product_by_id(item.product_id)
-        if product is not None:
-            products_with_name.append(
-                (item.product_id, f"{product.name} ({item.product_id})")
-            )
+    products = [get_product_by_id(item.product_id) for item in items]
+    products = filter(None, products)  # если товар был удален из таблицы с товарами
+    products_options = [(p.id, f"{p.name} ({p.sku})") for p in products]
 
-    valid_products: list[tuple[int, str]] = [
-        (p[0], p[1]) for p in products_with_name if p[1] is not None
-    ]
-
-    product_id = choice(message="Выберите товар:", options=valid_products)
+    product_id = choice(message="Выберите товар:", options=products_options)
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
         cur.execute(
             "SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
             (order_id, product_id),
         )
-        item_result: OrderItem | None = cur.fetchone()
-
-    if item_result is None:
-        render_error(f"Товар с ID {product_id} не найден в заказе")
-        return
+        item: OrderItem = cur.fetchone()
 
     quantity = prompt(
-        "Количество: ", default=str(item_result.quantity), validator=QuantityValidator()
+        "Количество: ", default=str(item.quantity), validator=QuantityValidator()
     ).strip()
     product = get_product_by_id(product_id)
-    if product is None:
-        render_error(f"Товар с ID {product_id} не найден")
-        return
 
     with conn.transaction():
         conn.execute(
@@ -222,12 +194,9 @@ def edit_order_item(order_id: int) -> None:
             (quantity, product.price, order_id, product_id),
         )
         order = get_order_by_id(order_id)
-        if order is None:
-            render_error(f"Нет заказа с ID {order_id}")
-            return
         total_amount = (
             order.total_amount
-            - Decimal(item_result.quantity) * item_result.price
+            - Decimal(item.quantity) * item.price
             + Decimal(quantity) * product.price
         )
         conn.execute(
@@ -258,31 +227,20 @@ def delete_order_item(order_id: int) -> None:
         render_error(f"В заказе с ID {order_id} нет товаров")
         return
 
-    products_with_name: list[tuple[int, str]] = []
-    for item in items:
-        product = get_product_by_id(item.product_id)
-        if product is not None:
-            products_with_name.append(
-                (item.product_id, f"{product.name} ({item.product_id})")
-            )
-    valid_products: list[tuple[int, str]] = [
-        (p[0], p[1]) for p in products_with_name if p[1] is not None
-    ]
+    products = [get_product_by_id(item.product_id) for item in items]
+    products = filter(None, products)  # если товар был удален из таблицы с товарами
+    products_options = [(p.id, f"{p.name} ({p.sku})") for p in products]
 
-    product_id = choice(message="Выберите товар:", options=valid_products)
+    product_id = choice(message="Выберите товар:", options=products_options)
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
         cur.execute(
             "SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
             (order_id, product_id),
         )
-        item_result: OrderItem | None = cur.fetchone()
+        item: OrderItem = cur.fetchone()
 
-    if item_result is None:
-        render_error(f"Товар с ID {product_id} не найден в заказе")
-        return
-
-    _render_order_item(item_result)
+    _render_order_item(item)
 
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
 
@@ -293,12 +251,7 @@ def delete_order_item(order_id: int) -> None:
                 (order_id, product_id),
             )
             order = get_order_by_id(order_id)
-            if order is None:
-                render_error(f"Нет заказа с ID {order_id}")
-                return
-            total_amount = (
-                order.total_amount - Decimal(item_result.quantity) * item_result.price
-            )
+            total_amount = order.total_amount - Decimal(item.quantity) * item.price
             conn.execute(
                 "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
                 (total_amount, order_id),
