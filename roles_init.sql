@@ -1,6 +1,5 @@
-CREATE ROLE catalog_manager WITH LOGIN PASSWORD 'catalog';
-CREATE ROLE sales_manager WITH LOGIN PASSWORD 'sales';
-CREATE ROLE supervisor WITH LOGIN PASSWORD 'password';
-CREATE ROLE inventory_manager WITH LOGIN PASSWORD 'inventory';
-CREATE ROLE worker WITH LOGIN PASSWORD 'worker';
-
+CREATE ROLE IF NOT EXISTS catalog_manager WITH LOGIN PASSWORD 'catalog';
+CREATE ROLE IF NOT EXISTS sales_manager WITH LOGIN PASSWORD 'sales';
+CREATE ROLE IF NOT EXISTS supervisor WITH LOGIN PASSWORD 'password';
+CREATE ROLE IF NOT EXISTS inventory_manager WITH LOGIN PASSWORD 'inventory';
+CREATE ROLE IF NOT EXISTS worker WITH LOGIN PASSWORD 'worker';
