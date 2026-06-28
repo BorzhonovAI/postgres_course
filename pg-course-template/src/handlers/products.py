@@ -8,8 +8,8 @@ from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
-from product_categories import get_product_categories, get_category_name_by_id
-from structures import Product
+from .product_categories import get_product_categories, get_category_name_by_id
+from .structures import Product
 from validators import NonEmptyValidator, YesNoValidator, PriceValidator
 
 

@@ -8,7 +8,7 @@ from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from commands import command, CATEGORY_WAREHOUSES
 from console import console, render_error
 from db import get_conn
-from structures import Warehouse
+from .structures import Warehouse
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
 
 

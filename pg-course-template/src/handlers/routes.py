@@ -8,7 +8,7 @@ from auth import ROLE_INVENTORY_MANAGER
 from commands import command, CATEGORY_ROUTES
 from console import console, render_error
 from db import get_conn
-from structures import Route
+from .structures import Route
 from validators import (
     ChoiceValidator,
     NonEmptyValidator,

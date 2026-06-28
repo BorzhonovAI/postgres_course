@@ -8,7 +8,7 @@ from rich.table import Table
 from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from console import console, render_error
 from db import get_conn
-from structures import ProductCategory
+from .structures import ProductCategory
 from validators import NonEmptyValidator, YesNoValidator
 from commands import command, CATEGORY_PRODUCTS_CATEGORIES
 
@@ -18,6 +18,9 @@ def get_category_name_by_id(_id: int) -> str | None:
     with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
         cur.execute("SELECT * FROM catalog.product_categories WHERE id = %s", (_id,))
         category: ProductCategory | None = cur.fetchone()
+
+    if category is None:
+        return None
 
     return category.name
 

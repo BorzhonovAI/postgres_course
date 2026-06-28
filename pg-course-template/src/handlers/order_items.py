@@ -11,8 +11,8 @@ from auth import ROLE_SALES_MANAGER
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
-from products import get_product_name_by_id, get_products, get_product_by_id, get_product_by_sku
-from structures import OrderItem, Order, Product
+from .products import get_product_name_by_id, get_products, get_product_by_id, get_product_by_sku
+from .structures import OrderItem, Order, Product
 from validators import YesNoValidator, ChoiceValidator, QuantityValidator
 
 

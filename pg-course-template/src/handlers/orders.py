@@ -8,11 +8,11 @@ from auth import ROLE_SALES_MANAGER, auth_user
 from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
-from order_items import add_order_item
-from structures import Order
+from .order_items import add_order_item
+from .structures import Order
 from users import get_user
 from validators import YesNoValidator
-from warehouses import get_warehouse_full_address, get_warehouses, get_city_name
+from .warehouses import get_warehouse_full_address, get_warehouses, get_city_name
 
 
 def _render_order(order: Order):
