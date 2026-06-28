@@ -24,19 +24,23 @@ for _key, _default in [
 # db.py, auth.py, and commands.py hold module-level mutable singletons.
 # Reset them before every test so tests don't leak state into each other.
 
+
 @pytest.fixture(autouse=True)
 def _reset_global_state():
     """Reset _CONN, _USER, and _COMMANDS_REGISTRY before each test."""
     # Reset db._CONN
     import db  # noqa: F811
+
     db._CONN = None
 
     # Reset auth._USER
     import auth  # noqa: F811
+
     auth._USER = None
 
     # Reset commands registry
     import commands  # noqa: F811
+
     commands._COMMANDS_REGISTRY.clear()
 
     # Force handlers to re-register on next import by removing them
@@ -55,6 +59,7 @@ def _reset_global_state():
 # returning the mock; they MUST NOT import handlers (which would auto-
 # register commands and reach for the real connection).
 
+
 @pytest.fixture
 def mock_db():
     """Return a mock psycopg.Connection injected via db._CONN."""
@@ -66,6 +71,7 @@ def mock_db():
     mock_conn.cursor = MagicMock(return_value=mock_cursor)
 
     import db  # noqa: F811
+
     db._CONN = mock_conn
 
     try:
@@ -76,6 +82,7 @@ def mock_db():
 
 # ─── Mock auth user ──────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_user():
     """Create a fake authenticated User and set auth._USER."""
@@ -84,12 +91,14 @@ def mock_user():
     user = User(id=1, username="test_user", role="catalog_manager")
 
     import auth  # noqa: F811
+
     auth._USER = user
 
     return user
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def document():

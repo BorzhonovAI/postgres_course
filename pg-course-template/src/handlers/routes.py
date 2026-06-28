@@ -161,7 +161,7 @@ def add_route() -> None:
     # Calculate which from-cities already have all possible routes covered
     # so we can hide them from the departure dropdown
     total_count = len(city_names)
-    from_coverage = {}  # from_id -> set of to_ids
+    from_coverage: dict[int, set[int]] = {}
     for from_id, to_id in existing_routes:
         from_coverage.setdefault(from_id, set()).add(to_id)
     exhausted_from_ids = {

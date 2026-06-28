@@ -17,8 +17,7 @@ class TestGetProductById:
         from handlers.structures import Product
 
         product_data = Product(
-            id=1, sku="ABC-001", name="Видеокарта",
-            price="299.99", category_id=1
+            id=1, sku="ABC-001", name="Видеокарта", price="299.99", category_id=1
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -51,8 +50,7 @@ class TestGetProductBySku:
         from handlers.structures import Product
 
         product_data = Product(
-            id=5, sku="XYZ-999", name="Клавиатура",
-            price="49.99", category_id=2
+            id=5, sku="XYZ-999", name="Клавиатура", price="49.99", category_id=2
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -84,8 +82,7 @@ class TestGetProductByName:
         from handlers.structures import Product
 
         product_data = Product(
-            id=3, sku="MSE-042", name="Мышь",
-            price="19.99", category_id=2
+            id=3, sku="MSE-042", name="Мышь", price="19.99", category_id=2
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -160,7 +157,9 @@ class TestShowProduct:
             from handlers import products  # noqa: F811
 
             with patch("handlers.products.console") as mock_console:
-                with patch("handlers.products.get_category_name_by_id", return_value="Кат"):
+                with patch(
+                    "handlers.products.get_category_name_by_id", return_value="Кат"
+                ):
                     products.show_product("42")
                     assert mock_console.print.call_count >= 1
 

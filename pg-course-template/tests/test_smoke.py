@@ -15,5 +15,6 @@ def test_global_state_reset():
 def test_mock_db_fixture(mock_db):  # noqa: F811
     """mock_db fixture injects a usable mock connection."""
     import db
+
     conn = db.get_conn()
     assert conn is not None

@@ -48,7 +48,9 @@ class TestIsProductInOrder:
         from decimal import Decimal
 
         item = OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
-        product = Product(id=5, sku="SKU-5", name="Товар", price=Decimal("100"), category_id=1)
+        product = Product(
+            id=5, sku="SKU-5", name="Товар", price=Decimal("100"), category_id=1
+        )
 
         assert is_product_in_order([item], product) is True
 
@@ -58,7 +60,9 @@ class TestIsProductInOrder:
         from decimal import Decimal
 
         item = OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
-        product = Product(id=99, sku="SKU-99", name="Другой", price=Decimal("200"), category_id=2)
+        product = Product(
+            id=99, sku="SKU-99", name="Другой", price=Decimal("200"), category_id=2
+        )
 
         assert is_product_in_order([item], product) is False
 
@@ -67,7 +71,9 @@ class TestIsProductInOrder:
         from handlers.structures import Product
         from decimal import Decimal
 
-        product = Product(id=1, sku="SKU-1", name="Товар", price=Decimal("50"), category_id=1)
+        product = Product(
+            id=1, sku="SKU-1", name="Товар", price=Decimal("50"), category_id=1
+        )
 
         assert is_product_in_order([], product) is False
 
@@ -81,8 +87,12 @@ class TestGetOrderById:
         from decimal import Decimal
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("0"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("0"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -128,8 +138,12 @@ class TestCheckOrder:
         from decimal import Decimal
 
         order_data = Order(
-            id=1, status="new", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="new",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -150,8 +164,12 @@ class TestCheckOrder:
         from decimal import Decimal
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value

@@ -54,6 +54,7 @@ class City:
 
 # ─── Inventory domain ───
 
+
 @dataclass
 class Route:
     from_city_id: int

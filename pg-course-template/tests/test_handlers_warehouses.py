@@ -53,8 +53,9 @@ class TestGetWarehouseById:
     def test_finds_existing_warehouse(self, mock_db, mock_user):
         from handlers.structures import Warehouse
 
-        warehouse_data = Warehouse(id=1, city_id=2, address="ул. Ленина 10",
-                                   label="Главный", is_central=True)
+        warehouse_data = Warehouse(
+            id=1, city_id=2, address="ул. Ленина 10", label="Главный", is_central=True
+        )
 
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchone.return_value = warehouse_data
@@ -100,7 +101,9 @@ class TestListWarehouses:
         from handlers.structures import Warehouse
 
         wh1 = Warehouse(id=1, city_id=1, address="ул. А 1", label="A", is_central=True)
-        wh2 = Warehouse(id=2, city_id=2, address="ул. Б 2", label=None, is_central=False)
+        wh2 = Warehouse(
+            id=2, city_id=2, address="ул. Б 2", label=None, is_central=False
+        )
 
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchall.return_value = [wh1, wh2]

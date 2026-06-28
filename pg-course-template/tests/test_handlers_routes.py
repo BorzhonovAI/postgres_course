@@ -136,12 +136,14 @@ class TestExhaustedCityFiltering:
                     from_coverage.setdefault(fid, set()).add(tid)
 
                 exhausted_from_ids = {
-                    fid for fid, tids in from_coverage.items()
+                    fid
+                    for fid, tids in from_coverage.items()
                     if len(tids) == total_count - 1
                 }
 
                 from_candidates = [
-                    name for name in city_names
+                    name
+                    for name in city_names
                     if name_to_id[name] not in exhausted_from_ids
                 ]
 
@@ -172,8 +174,11 @@ class TestShowRouteErrors:
 
             # Simulate user selecting a route, but DB returns None
             with patch("handlers.routes.prompt", return_value="Москва → Казань"):
-                with patch.object(routes, "_get_route_options",
-                                 return_value=(["Москва → Казань"], {"Москва → Казань": (1, 2)})):
+                with patch.object(
+                    routes,
+                    "_get_route_options",
+                    return_value=(["Москва → Казань"], {"Москва → Казань": (1, 2)}),
+                ):
                     with patch("handlers.routes.render_error") as mock_error:
                         routes.show_route()
                         mock_error.assert_called_once()

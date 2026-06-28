@@ -43,7 +43,8 @@ class TestShowHelp:
             from rich.panel import Panel
 
             panel_call = [
-                c for c in mock_console.print.call_args_list
+                c
+                for c in mock_console.print.call_args_list
                 if len(c[0]) > 0 and isinstance(c[0][0], Panel)
             ]
             assert len(panel_call) > 0

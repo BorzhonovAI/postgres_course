@@ -87,9 +87,7 @@ class TestGetUser:
         from unittest.mock import patch as mock_patch
 
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchone.return_value = User(
-            id=5, username="eve", role="worker"
-        )
+        mock_cursor.fetchone.return_value = User(id=5, username="eve", role="worker")
 
         with mock_patch("db.get_conn", return_value=mock_db):
             from users import get_user
@@ -149,9 +147,7 @@ class TestLogin:
         """User with role not in ALL_ROLES raises ValueError."""
         rogue_user = User(id=99, username="hacker", role="unknown_role")
 
-        with patch(
-            "auth.find_user_by_login_and_pass", return_value=rogue_user
-        ):
+        with patch("auth.find_user_by_login_and_pass", return_value=rogue_user):
             with patch("auth.console"):
                 from auth import login
 
@@ -178,9 +174,7 @@ class TestLogin:
         """Interactive prompt loop sets _USER on valid credentials."""
         fake_user = User(id=3, username="carol", role="inventory_manager")
 
-        with patch(
-            "auth.find_user_by_login_and_pass", return_value=fake_user
-        ):
+        with patch("auth.find_user_by_login_and_pass", return_value=fake_user):
             with patch("auth.prompt", side_effect=["carol", "pass"]):
                 with patch("auth.console"):
                     import auth  # noqa: F811

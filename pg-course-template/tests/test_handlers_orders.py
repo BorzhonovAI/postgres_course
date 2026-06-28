@@ -31,8 +31,12 @@ class TestShowOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -65,8 +69,12 @@ class TestEditOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="new", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="new",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -84,8 +92,12 @@ class TestEditOrder:
         from handlers.structures import Order, Warehouse
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -95,7 +107,15 @@ class TestEditOrder:
             from handlers import orders  # noqa: F811
 
             with patch("handlers.orders.get_warehouses") as mock_whs:
-                mock_whs.return_value = [Warehouse(id=1, address="ул. Тест, 1", city_id=1, label="test", is_central=True)]
+                mock_whs.return_value = [
+                    Warehouse(
+                        id=1,
+                        address="ул. Тест, 1",
+                        city_id=1,
+                        label="test",
+                        is_central=True,
+                    )
+                ]
                 with patch("handlers.orders.get_city_name", return_value="Город"):
                     with patch("handlers.orders.choice", return_value=1):
                         with patch("handlers.orders.console") as mock_console:
@@ -103,7 +123,8 @@ class TestEditOrder:
 
                             # UPDATE executed
                             update_calls = [
-                                c for c in mock_db.execute.call_args_list
+                                c
+                                for c in mock_db.execute.call_args_list
                                 if "UPDATE" in c[0][0]
                             ]
                             assert len(update_calls) >= 1
@@ -129,8 +150,12 @@ class TestDeleteOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="new", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="new",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -148,8 +173,12 @@ class TestDeleteOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -164,7 +193,8 @@ class TestDeleteOrder:
                         orders.delete_order("1")
 
                         delete_calls = [
-                            c for c in mock_db.execute.call_args_list
+                            c
+                            for c in mock_db.execute.call_args_list
                             if "DELETE" in c[0][0]
                         ]
                         assert len(delete_calls) >= 1
@@ -190,8 +220,12 @@ class TestPublishOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="new", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="new",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -209,8 +243,12 @@ class TestPublishOrder:
         from handlers.structures import Order
 
         order_data = Order(
-            id=1, status="unpublished", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -223,8 +261,7 @@ class TestPublishOrder:
                 orders.publish_order("1")
 
                 update_calls = [
-                    c for c in mock_db.execute.call_args_list
-                    if "UPDATE" in c[0][0]
+                    c for c in mock_db.execute.call_args_list if "UPDATE" in c[0][0]
                 ]
                 assert len(update_calls) >= 1
 
@@ -253,7 +290,15 @@ class TestAddOrder:
             mock_db.transaction = MagicMock(return_value=mock_tx)
 
             with patch("handlers.orders.get_warehouses") as mock_whs:
-                mock_whs.return_value = [Warehouse(id=1, address="ул. Тест, 1", city_id=1, label="test", is_central=True)]
+                mock_whs.return_value = [
+                    Warehouse(
+                        id=1,
+                        address="ул. Тест, 1",
+                        city_id=1,
+                        label="test",
+                        is_central=True,
+                    )
+                ]
                 with patch("handlers.orders.get_city_name", return_value="Город"):
                     with patch("handlers.orders.choice", return_value=1):
                         with patch("handlers.orders.auth_user") as mock_auth:
@@ -264,7 +309,8 @@ class TestAddOrder:
 
                                     # INSERT executed via conn.execute
                                     insert_calls = [
-                                        c for c in mock_db.execute.call_args_list
+                                        c
+                                        for c in mock_db.execute.call_args_list
                                         if "INSERT" in c[0][0]
                                     ]
                                     assert len(insert_calls) >= 1
@@ -283,12 +329,20 @@ class TestListOrders:
         from handlers.structures import Order
 
         order1 = Order(
-            id=1, status="unpublished", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1
+            id=1,
+            status="unpublished",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         order2 = Order(
-            id=2, status="new", total_amount=Decimal("500"),
-            created_at=datetime.now(), warehouse_id=2, created_by_id=1
+            id=2,
+            status="new",
+            total_amount=Decimal("500"),
+            created_at=datetime.now(),
+            warehouse_id=2,
+            created_by_id=1,
         )
 
         mock_cursor = mock_db.cursor.return_value
@@ -297,7 +351,9 @@ class TestListOrders:
         with patch("db.get_conn", return_value=mock_db):
             from handlers import orders  # noqa: F811
 
-            with patch("handlers.orders.get_warehouse_full_address", return_value="ул. Тест, 1"):
+            with patch(
+                "handlers.orders.get_warehouse_full_address", return_value="ул. Тест, 1"
+            ):
                 with patch("handlers.orders.get_user") as mock_get_user:
                     mock_get_user.return_value = mock_user
                     with patch("handlers.orders.console") as mock_console:

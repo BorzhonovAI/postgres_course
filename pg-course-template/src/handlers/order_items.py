@@ -11,7 +11,12 @@ from auth import ROLE_SALES_MANAGER
 from commands import command, CATEGORY_ORDER_ITEMS
 from console import console, render_error
 from db import get_conn
-from .products import get_product_name_by_id, get_products, get_product_by_id, get_product_by_sku
+from .products import (
+    get_product_name_by_id,
+    get_products,
+    get_product_by_id,
+    get_product_by_sku,
+)
 from .structures import OrderItem, Order, Product
 from validators import YesNoValidator, ChoiceValidator, QuantityValidator
 
@@ -41,7 +46,7 @@ def get_sku(product_name_with_sku: str) -> str | None:
     start = product_name_with_sku.find("(")
     end = product_name_with_sku.find(")", start)
     if start != -1 and end != -1:
-        return product_name_with_sku[start + 1:end]
+        return product_name_with_sku[start + 1 : end]
     return None
 
 
@@ -81,10 +86,12 @@ def is_product_in_order(order_items: list[OrderItem], product: Product) -> bool:
     return False
 
 
-@command("add order_item",
-         "добавить товар к заказу (интерактивно)",
-         CATEGORY_ORDER_ITEMS,
-         [ROLE_SALES_MANAGER])
+@command(
+    "add order_item",
+    "добавить товар к заказу (интерактивно)",
+    CATEGORY_ORDER_ITEMS,
+    [ROLE_SALES_MANAGER],
+)
 def add_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -100,16 +107,18 @@ def add_order_item(order_id: int) -> None:
         return
 
     products_str = [f"{p.name} ({p.sku})" for p in products]
-    product_name_completer = WordCompleter(products_str, ignore_case=True, sentence=True)
+    product_name_completer = WordCompleter(
+        products_str, ignore_case=True, sentence=True
+    )
     product_name_validator = ChoiceValidator(
-        products_str, message="Товар должен быть из списка. "
-                              "Используйте Tab для автодополнения."
+        products_str,
+        message="Товар должен быть из списка. " "Используйте Tab для автодополнения.",
     )
 
     product_name_with_sku = prompt(
         "Имя товара: ",
         validator=product_name_validator,
-        completer=product_name_completer
+        completer=product_name_completer,
     ).strip()
     sku = get_sku(product_name_with_sku)
     product: Product = get_product_by_sku(sku)
@@ -131,17 +140,23 @@ def add_order_item(order_id: int) -> None:
             (total_amount, order_id),
         )
 
-    console.print(f"[green]Товар {product.name} добавлен к заказу ({order_id})  [/green]")
+    console.print(
+        f"[green]Товар {product.name} добавлен к заказу ({order_id})  [/green]"
+    )
 
-    answer = prompt("Желаете добавить еще товары? (y/n, д/н): ", validator=YesNoValidator())
+    answer = prompt(
+        "Желаете добавить еще товары? (y/n, д/н): ", validator=YesNoValidator()
+    )
     if YesNoValidator.is_yes(answer):
         add_order_item(order_id)
 
 
-@command("edit order_item",
-         "редактировать товар в заказе",
-         CATEGORY_ORDER_ITEMS,
-         [ROLE_SALES_MANAGER])
+@command(
+    "edit order_item",
+    "редактировать товар в заказе",
+    CATEGORY_ORDER_ITEMS,
+    [ROLE_SALES_MANAGER],
+)
 def edit_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -158,40 +173,48 @@ def edit_order_item(order_id: int) -> None:
     products = filter(None, products)  # если товар был удален из таблицы с товарами
     products_options = [(p.id, f"{p.name} ({p.sku})") for p in products]
 
-    product_id = choice(
-        message="Выберите товар:",
-        options=products_options
-    )
+    product_id = choice(message="Выберите товар:", options=products_options)
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s", (order_id, product_id))
+        cur.execute(
+            "SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+            (order_id, product_id),
+        )
         item: OrderItem = cur.fetchone()
 
-    quantity = prompt("Количество: ", default=str(item.quantity), validator=QuantityValidator()).strip()
+    quantity = prompt(
+        "Количество: ", default=str(item.quantity), validator=QuantityValidator()
+    ).strip()
     product = get_product_by_id(product_id)
 
     with conn.transaction():
         conn.execute(
             """UPDATE sales.order_items SET quantity = %s, price = %s
             WHERE order_id = %s AND product_id=%s""",
-            (quantity, product.price, order_id, product_id)
+            (quantity, product.price, order_id, product_id),
         )
         order = get_order_by_id(order_id)
-        total_amount = (order.total_amount -
-                        Decimal(item.quantity) * item.price +
-                        Decimal(quantity) * product.price)
+        total_amount = (
+            order.total_amount
+            - Decimal(item.quantity) * item.price
+            + Decimal(quantity) * product.price
+        )
         conn.execute(
             "UPDATE sales.orders SET total_amount = %s WHERE id = %s",
             (total_amount, order_id),
         )
 
-    console.print(f"[green]Товар {product.name} обновлен в заказе ({order_id})  [/green]")
+    console.print(
+        f"[green]Товар {product.name} обновлен в заказе ({order_id})  [/green]"
+    )
 
 
-@command("delete order_item",
-         "удалить товар из заказа",
-         CATEGORY_ORDER_ITEMS,
-         [ROLE_SALES_MANAGER])
+@command(
+    "delete order_item",
+    "удалить товар из заказа",
+    CATEGORY_ORDER_ITEMS,
+    [ROLE_SALES_MANAGER],
+)
 def delete_order_item(order_id: int) -> None:
     conn = get_conn()
 
@@ -208,13 +231,13 @@ def delete_order_item(order_id: int) -> None:
     products = filter(None, products)  # если товар был удален из таблицы с товарами
     products_options = [(p.id, f"{p.name} ({p.sku})") for p in products]
 
-    product_id = choice(
-        message="Выберите товар:",
-        options=products_options
-    )
+    product_id = choice(message="Выберите товар:", options=products_options)
 
     with conn.cursor(row_factory=class_row(OrderItem)) as cur:
-        cur.execute("SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s", (order_id, product_id))
+        cur.execute(
+            "SELECT * FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+            (order_id, product_id),
+        )
         item: OrderItem = cur.fetchone()
 
     _render_order_item(item)
@@ -223,8 +246,10 @@ def delete_order_item(order_id: int) -> None:
 
     if YesNoValidator.is_yes(answer):
         with conn.transaction():
-            conn.execute("DELETE FROM sales.order_items WHERE order_id = %s AND product_id=%s",
-                         (order_id, product_id))
+            conn.execute(
+                "DELETE FROM sales.order_items WHERE order_id = %s AND product_id=%s",
+                (order_id, product_id),
+            )
             order = get_order_by_id(order_id)
             total_amount = order.total_amount - Decimal(item.quantity) * item.price
             conn.execute(

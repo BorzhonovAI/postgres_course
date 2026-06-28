@@ -120,7 +120,7 @@ def get_args(user_input: str, cmd: Command) -> dict[str, str]:
         raise ValueError(f"Input is not aligned with {cmd.text}")
     command_parts = cmd.text.split()
     input_parts = user_input.split()
-    args = input_parts[len(command_parts):]
+    args = input_parts[len(command_parts) :]
     if len(args) != len(cmd.args):
         raise ValueError(f"Command {cmd.text} expects {len(cmd.args)} argument(s)")
     return dict(zip(cmd.args, args))

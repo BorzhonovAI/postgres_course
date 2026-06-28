@@ -19,7 +19,9 @@ class TestGetConnNotInitialized:
         """After reset fixture, _CONN is None, so get_conn() raises."""
         from db import get_conn
 
-        with pytest.raises(RuntimeError, match="Database connection has not been established"):
+        with pytest.raises(
+            RuntimeError, match="Database connection has not been established"
+        ):
             get_conn()
 
 

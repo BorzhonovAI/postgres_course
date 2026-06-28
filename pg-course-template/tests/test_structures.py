@@ -76,16 +76,24 @@ class TestOrder:
     def test_processing_by_id_defaults_to_none(self):
         now = datetime(2025, 6, 1, 12, 0)
         order = Order(
-            id=1, status="new", total_amount=Decimal("50.0"),
-            created_at=now, warehouse_id=1, created_by_id=2,
+            id=1,
+            status="new",
+            total_amount=Decimal("50.0"),
+            created_at=now,
+            warehouse_id=1,
+            created_by_id=2,
         )
         assert order.processing_by_id is None
 
     def test_processing_by_id_set(self):
         now = datetime(2025, 6, 1, 12, 0)
         order = Order(
-            id=2, status="processing", total_amount=Decimal("10.0"),
-            created_at=now, warehouse_id=1, created_by_id=2,
+            id=2,
+            status="processing",
+            total_amount=Decimal("10.0"),
+            created_at=now,
+            warehouse_id=1,
+            created_by_id=2,
             processing_by_id=5,
         )
         assert order.processing_by_id == 5
@@ -124,7 +132,9 @@ class TestProduct:
         }
 
     def test_instance(self):
-        p = Product(id=1, sku="ABC-001", name="Widget", price=Decimal("1.23"), category_id=2)
+        p = Product(
+            id=1, sku="ABC-001", name="Widget", price=Decimal("1.23"), category_id=2
+        )
         assert p.sku == "ABC-001"
         assert p.price == Decimal("1.23")
 
@@ -151,7 +161,9 @@ class TestWarehouse:
         assert w.label is None
 
     def test_label_set(self):
-        w = Warehouse(id=2, city_id=1, address="Side St", label="WH-2", is_central=False)
+        w = Warehouse(
+            id=2, city_id=1, address="Side St", label="WH-2", is_central=False
+        )
         assert w.label == "WH-2"
 
 
@@ -183,8 +195,10 @@ class TestRoute:
 
     def test_instance(self):
         r = Route(
-            from_city_id=1, to_city_id=2,
-            duration=timedelta(hours=3), total_threshold=10,
+            from_city_id=1,
+            to_city_id=2,
+            duration=timedelta(hours=3),
+            total_threshold=10,
         )
         assert r.duration == timedelta(hours=3)
 
@@ -224,15 +238,23 @@ class TestDelivery:
 
     def test_shipped_at_none(self):
         d = Delivery(
-            id=1, order_id=5, status="pending",
-            created_at=datetime(2025, 7, 1), shipped_at=None, created_by_id=3,
+            id=1,
+            order_id=5,
+            status="pending",
+            created_at=datetime(2025, 7, 1),
+            shipped_at=None,
+            created_by_id=3,
         )
         assert d.shipped_at is None
 
     def test_shipped_at_set(self):
         d = Delivery(
-            id=2, order_id=6, status="shipped",
-            created_at=datetime(2025, 7, 1), shipped_at=datetime(2025, 7, 2), created_by_id=3,
+            id=2,
+            order_id=6,
+            status="shipped",
+            created_at=datetime(2025, 7, 1),
+            shipped_at=datetime(2025, 7, 2),
+            created_by_id=3,
         )
         assert d.shipped_at == datetime(2025, 7, 2)
 
@@ -277,9 +299,14 @@ class TestTransfer:
 
     def test_optional_datetime_fields_none(self):
         t = Transfer(
-            id=1, from_warehouse_id=1, to_warehouse_id=2,
-            status="in_progress", created_at=datetime(2025, 8, 1),
-            started_at=None, arriving_at=None, received_at=None,
+            id=1,
+            from_warehouse_id=1,
+            to_warehouse_id=2,
+            status="in_progress",
+            created_at=datetime(2025, 8, 1),
+            started_at=None,
+            arriving_at=None,
+            received_at=None,
             total_amount=Decimal("99.9"),
         )
         assert t.started_at is None
@@ -288,10 +315,15 @@ class TestTransfer:
 
     def test_optional_datetime_fields_set(self):
         t = Transfer(
-            id=2, from_warehouse_id=1, to_warehouse_id=2,
-            status="received", created_at=datetime(2025, 8, 1),
-            started_at=datetime(2025, 8, 2), arriving_at=datetime(2025, 8, 3),
-            received_at=datetime(2025, 8, 4), total_amount=Decimal("50.0"),
+            id=2,
+            from_warehouse_id=1,
+            to_warehouse_id=2,
+            status="received",
+            created_at=datetime(2025, 8, 1),
+            started_at=datetime(2025, 8, 2),
+            arriving_at=datetime(2025, 8, 3),
+            received_at=datetime(2025, 8, 4),
+            total_amount=Decimal("50.0"),
         )
         assert t.started_at == datetime(2025, 8, 2)
         assert t.arriving_at == datetime(2025, 8, 3)
@@ -318,15 +350,25 @@ class TestTransferItem:
 
     def test_reserve_id_none(self):
         ti = TransferItem(
-            id=1, transfer_id=10, product_id=5, quantity=2,
-            requested_by_id=3, reserve_id=None, status="reserved",
+            id=1,
+            transfer_id=10,
+            product_id=5,
+            quantity=2,
+            requested_by_id=3,
+            reserve_id=None,
+            status="reserved",
         )
         assert ti.reserve_id is None
 
     def test_reserve_id_set(self):
         ti = TransferItem(
-            id=2, transfer_id=10, product_id=5, quantity=2,
-            requested_by_id=3, reserve_id=7, status="shipped",
+            id=2,
+            transfer_id=10,
+            product_id=5,
+            quantity=2,
+            requested_by_id=3,
+            reserve_id=7,
+            status="shipped",
         )
         assert ti.reserve_id == 7
 
@@ -352,9 +394,19 @@ class TestAllStructures:
     """Cross-cutting checks on all dataclasses."""
 
     ALL = [
-        OrderItem, Order, ProductCategory, Product,
-        Warehouse, City, Route, Stock, Delivery,
-        DeliveryItem, Transfer, TransferItem, Reserve,
+        OrderItem,
+        Order,
+        ProductCategory,
+        Product,
+        Warehouse,
+        City,
+        Route,
+        Stock,
+        Delivery,
+        DeliveryItem,
+        Transfer,
+        TransferItem,
+        Reserve,
     ]
 
     def test_all_are_dataclasses(self):
@@ -367,4 +419,6 @@ class TestAllStructures:
             for field in dataclasses.fields(cls):
                 if field.default is not dataclasses.MISSING:
                     # Field has a default — it should be optional type
-                    assert field.default is None, f"{cls.__name__}.{field.name} has unexpected default {field.default}"
+                    assert (
+                        field.default is None
+                    ), f"{cls.__name__}.{field.name} has unexpected default {field.default}"

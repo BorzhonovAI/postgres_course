@@ -162,13 +162,18 @@ class TestDeleteAllProductCategories:
                     # products truncated BEFORE categories (FK constraint)
                     calls = [c[0][0] for c in mock_db.execute.call_args_list]
                     products_call = [c for c in calls if "catalog.products" in c]
-                    categories_call = [c for c in calls if "catalog.product_categories" in c]
+                    categories_call = [
+                        c for c in calls if "catalog.product_categories" in c
+                    ]
 
                     assert len(products_call) >= 1, "TRUNCATE products was not called"
-                    assert len(categories_call) >= 1, "TRUNCATE categories was not called"
+                    assert (
+                        len(categories_call) >= 1
+                    ), "TRUNCATE categories was not called"
 
                     # Products must be truncated before categories
                     products_index = calls.index(products_call[0])
                     categories_index = calls.index(categories_call[0])
-                    assert products_index < categories_index, \
-                        "Products should be truncated before categories (FK safety)"
+                    assert (
+                        products_index < categories_index
+                    ), "Products should be truncated before categories (FK safety)"
