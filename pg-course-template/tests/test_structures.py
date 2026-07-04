@@ -70,10 +70,10 @@ class TestOrder:
             "created_at": datetime,
             "warehouse_id": int,
             "created_by_id": int,
-            "processing_by_id": int | None,
+            "processing_by": int | None,
         }
 
-    def test_processing_by_id_defaults_to_none(self):
+    def test_processing_by_defaults_to_none(self):
         now = datetime(2025, 6, 1, 12, 0)
         order = Order(
             id=1,
@@ -83,9 +83,9 @@ class TestOrder:
             warehouse_id=1,
             created_by_id=2,
         )
-        assert order.processing_by_id is None
+        assert order.processing_by is None
 
-    def test_processing_by_id_set(self):
+    def test_processing_by_set(self):
         now = datetime(2025, 6, 1, 12, 0)
         order = Order(
             id=2,
@@ -94,9 +94,9 @@ class TestOrder:
             created_at=now,
             warehouse_id=1,
             created_by_id=2,
-            processing_by_id=5,
+            processing_by=5,
         )
-        assert order.processing_by_id == 5
+        assert order.processing_by == 5
 
 
 class TestProductCategory:
@@ -190,7 +190,7 @@ class TestRoute:
             "from_city_id": int,
             "to_city_id": int,
             "duration": timedelta,
-            "total_threshold": int,
+            "total_threshold": Decimal,
         }
 
     def test_instance(self):
@@ -198,7 +198,7 @@ class TestRoute:
             from_city_id=1,
             to_city_id=2,
             duration=timedelta(hours=3),
-            total_threshold=10,
+            total_threshold=Decimal("10"),
         )
         assert r.duration == timedelta(hours=3)
 
@@ -212,7 +212,6 @@ class TestStock:
     def test_fields(self):
         fields = {f.name: f.type for f in dataclasses.fields(Stock)}
         assert fields == {
-            "id": int,
             "warehouse_id": int,
             "product_id": int,
             "quantity": int,
@@ -228,33 +227,30 @@ class TestDelivery:
     def test_fields(self):
         fields = {f.name: f.type for f in dataclasses.fields(Delivery)}
         assert fields == {
-            "id": int,
             "order_id": int,
             "status": str,
             "created_at": datetime,
             "shipped_at": datetime | None,
-            "created_by_id": int,
+            "created_by": int,
         }
 
     def test_shipped_at_none(self):
         d = Delivery(
-            id=1,
             order_id=5,
-            status="pending",
+            status="planned",
             created_at=datetime(2025, 7, 1),
             shipped_at=None,
-            created_by_id=3,
+            created_by=3,
         )
         assert d.shipped_at is None
 
     def test_shipped_at_set(self):
         d = Delivery(
-            id=2,
             order_id=6,
             status="shipped",
             created_at=datetime(2025, 7, 1),
             shipped_at=datetime(2025, 7, 2),
-            created_by_id=3,
+            created_by=3,
         )
         assert d.shipped_at == datetime(2025, 7, 2)
 
@@ -268,8 +264,6 @@ class TestDeliveryItem:
     def test_fields(self):
         fields = {f.name: f.type for f in dataclasses.fields(DeliveryItem)}
         assert fields == {
-            "id": int,
-            "delivery_id": int,
             "order_id": int,
             "product_id": int,
             "quantity": int,
@@ -294,7 +288,6 @@ class TestTransfer:
             "started_at": datetime | None,
             "arriving_at": datetime | None,
             "received_at": datetime | None,
-            "total_amount": Decimal,
         }
 
     def test_optional_datetime_fields_none(self):
@@ -302,12 +295,11 @@ class TestTransfer:
             id=1,
             from_warehouse_id=1,
             to_warehouse_id=2,
-            status="in_progress",
+            status="in_transit",
             created_at=datetime(2025, 8, 1),
             started_at=None,
             arriving_at=None,
             received_at=None,
-            total_amount=Decimal("99.9"),
         )
         assert t.started_at is None
         assert t.arriving_at is None
@@ -323,7 +315,6 @@ class TestTransfer:
             started_at=datetime(2025, 8, 2),
             arriving_at=datetime(2025, 8, 3),
             received_at=datetime(2025, 8, 4),
-            total_amount=Decimal("50.0"),
         )
         assert t.started_at == datetime(2025, 8, 2)
         assert t.arriving_at == datetime(2025, 8, 3)
@@ -343,7 +334,7 @@ class TestTransferItem:
             "transfer_id": int,
             "product_id": int,
             "quantity": int,
-            "requested_by_id": int,
+            "requested_by": int,
             "reserve_id": int | None,
             "status": str,
         }
@@ -354,9 +345,9 @@ class TestTransferItem:
             transfer_id=10,
             product_id=5,
             quantity=2,
-            requested_by_id=3,
+            requested_by=3,
             reserve_id=None,
-            status="reserved",
+            status="planned",
         )
         assert ti.reserve_id is None
 
@@ -366,7 +357,7 @@ class TestTransferItem:
             transfer_id=10,
             product_id=5,
             quantity=2,
-            requested_by_id=3,
+            requested_by=3,
             reserve_id=7,
             status="shipped",
         )
@@ -384,7 +375,6 @@ class TestReserve:
         assert fields == {
             "id": int,
             "order_id": int,
-            "warehouse_id": int,
             "product_id": int,
             "quantity": int,
         }

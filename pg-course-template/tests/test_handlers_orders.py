@@ -315,11 +315,42 @@ class TestAddOrder:
                                     ]
                                     assert len(insert_calls) >= 1
 
-                                    # auth_user was called to get created_by_id
+                                    # auth_user was called to get created_by
                                     mock_auth.assert_called_once()
 
                                     # show_order called with the new order_id
                                     mock_show.assert_called_once_with(42)
+
+    def test_insert_uses_created_by_id_column(self, mock_db, mock_user):
+        """INSERT must reference created_by_id (not created_by) to match DB schema."""
+        from handlers.structures import Warehouse
+
+        mock_db.execute.return_value.fetchone.return_value = (1,)
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import orders  # noqa: F811
+
+            mock_tx = MagicMock()
+            mock_tx.__enter__ = MagicMock(return_value=None)
+            mock_tx.__exit__ = MagicMock(return_value=False)
+            mock_db.transaction = MagicMock(return_value=mock_tx)
+
+            with patch("handlers.orders.get_warehouses") as mock_whs:
+                mock_whs.return_value = [Warehouse(id=1, address="x", city_id=1, label=None, is_central=True)]
+                with patch("handlers.orders.get_city_name", return_value="City"):
+                    with patch("handlers.orders.choice", return_value=1):
+                        with patch("handlers.orders.auth_user") as mock_auth:
+                            mock_auth.return_value = mock_user
+                            with patch("handlers.orders.prompt", return_value="n"):
+                                with patch("handlers.orders.show_order"):
+                                    orders.add_order()
+
+                                    insert_calls = [
+                                        c for c in mock_db.execute.call_args_list if "INSERT" in c[0][0]
+                                    ]
+                                    assert len(insert_calls) >= 1
+                                    # The SQL string must contain created_by_id
+                                    assert "created_by_id" in insert_calls[0][0][0]
 
 
 class TestListOrders:
