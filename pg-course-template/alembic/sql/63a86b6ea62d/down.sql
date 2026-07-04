@@ -12,7 +12,7 @@ REVOKE UPDATE (status, shipped_at) ON TABLE inventory.deliveries FROM worker;
 
 REVOKE UPDATE (status) ON TABLE inventory.delivery_items FROM worker;
 
-REVOKE UPDATE (status, started_at, arriving_at, received_at, total_amount) ON TABLE inventory.transfers FROM worker;
+REVOKE UPDATE (status, started_at, arriving_at, received_at) ON TABLE inventory.transfers FROM worker;
 
 REVOKE UPDATE (status) ON TABLE inventory.transfer_items FROM worker;
 

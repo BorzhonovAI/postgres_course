@@ -41,7 +41,7 @@ GRANT UPDATE (status, shipped_at) ON TABLE inventory.deliveries TO worker;
 GRANT UPDATE (status) ON TABLE inventory.delivery_items TO worker;
 
 -- Update statuses and dates in transfers
-GRANT UPDATE (status, started_at, arriving_at, received_at, total_amount) ON TABLE inventory.transfers TO worker;
+GRANT UPDATE (status, started_at, arriving_at, received_at) ON TABLE inventory.transfers TO worker;
 
 -- Update statuses in transfer_items
 GRANT UPDATE (status) ON TABLE inventory.transfer_items TO worker;
