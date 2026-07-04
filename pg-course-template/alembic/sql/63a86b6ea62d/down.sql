@@ -16,9 +16,6 @@ REVOKE UPDATE (status, started_at, arriving_at, received_at) ON TABLE inventory.
 
 REVOKE UPDATE (status) ON TABLE inventory.transfer_items FROM worker;
 
-REVOKE USAGE ON SCHEMA catalog FROM worker;
-REVOKE SELECT ON ALL TABLES IN SCHEMA catalog FROM worker;
-
 -- undo: inventory_manager grants
 
 REVOKE CREATE, USAGE ON SCHEMA inventory FROM inventory_manager;
@@ -29,9 +26,6 @@ REVOKE USAGE ON SCHEMA sales FROM inventory_manager;
 REVOKE SELECT ON TABLE sales.orders FROM inventory_manager;
 REVOKE SELECT ON TABLE sales.order_items FROM inventory_manager;
 REVOKE UPDATE (status) ON sales.orders FROM inventory_manager;
-
-REVOKE USAGE ON SCHEMA catalog FROM inventory_manager;
-REVOKE SELECT ON ALL TABLES IN SCHEMA catalog FROM inventory_manager;
 
 -- undo: auth schema PUBLIC grants
 

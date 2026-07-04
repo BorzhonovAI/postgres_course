@@ -17,9 +17,6 @@ GRANT SELECT ON TABLE sales.orders TO inventory_manager;
 GRANT SELECT ON TABLE sales.order_items TO inventory_manager;
 GRANT UPDATE(status) ON sales.orders TO inventory_manager;
 
-GRANT USAGE ON SCHEMA catalog TO inventory_manager;
-GRANT SELECT ON ALL TABLES IN SCHEMA catalog TO inventory_manager;
-
 -- ===== worker grants =====
 
 GRANT USAGE ON SCHEMA inventory TO worker;
@@ -45,8 +42,3 @@ GRANT UPDATE (status, started_at, arriving_at, received_at) ON TABLE inventory.t
 
 -- Update statuses in transfer_items
 GRANT UPDATE (status) ON TABLE inventory.transfer_items TO worker;
-
--- Read access to catalog for city/warehouse names
-GRANT USAGE ON SCHEMA catalog TO worker;
-GRANT SELECT ON ALL TABLES IN SCHEMA catalog TO worker;
-ALTER DEFAULT PRIVILEGES FOR ROLE app_user IN SCHEMA "catalog" GRANT SELECT ON TABLES TO worker;
