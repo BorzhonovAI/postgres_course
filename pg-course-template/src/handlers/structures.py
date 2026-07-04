@@ -18,8 +18,8 @@ class Order:
     total_amount: Decimal
     created_at: datetime
     warehouse_id: int
-    created_by_id: int
-    processing_by_id: int | None = None
+    created_by: int
+    processing_by: int | None = None
 
 
 @dataclass
@@ -60,12 +60,11 @@ class Route:
     from_city_id: int
     to_city_id: int
     duration: timedelta
-    total_threshold: int
+    total_threshold: Decimal
 
 
 @dataclass
 class Stock:
-    id: int
     warehouse_id: int
     product_id: int
     quantity: int
@@ -73,18 +72,15 @@ class Stock:
 
 @dataclass
 class Delivery:
-    id: int
     order_id: int
     status: str
     created_at: datetime
     shipped_at: datetime | None
-    created_by_id: int
+    created_by: int
 
 
 @dataclass
 class DeliveryItem:
-    id: int
-    delivery_id: int
     order_id: int
     product_id: int
     quantity: int
@@ -101,7 +97,6 @@ class Transfer:
     started_at: datetime | None
     arriving_at: datetime | None
     received_at: datetime | None
-    total_amount: Decimal
 
 
 @dataclass
@@ -110,7 +105,7 @@ class TransferItem:
     transfer_id: int
     product_id: int
     quantity: int
-    requested_by_id: int
+    requested_by: int
     reserve_id: int | None
     status: str
 
@@ -119,6 +114,5 @@ class TransferItem:
 class Reserve:
     id: int
     order_id: int
-    warehouse_id: int
     product_id: int
     quantity: int
