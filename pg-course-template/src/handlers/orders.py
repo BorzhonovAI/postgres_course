@@ -29,10 +29,10 @@ def _render_order(order: Order):
     )
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
-    user = get_user(order.created_by_id)
+    user = get_user(order.created_by)
     table.add_row("Владелец", user.username)
-    if order.processing_by_id is not None:
-        proc_user = get_user(order.processing_by_id)
+    if order.processing_by is not None:
+        proc_user = get_user(order.processing_by)
         table.add_row("Обработчик", proc_user.username if proc_user else "Неизвестно")
 
     panel = Panel(
@@ -63,7 +63,7 @@ def list_orders() -> None:
 
     for order in orders:
         address = get_warehouse_full_address(order.warehouse_id)
-        user = get_user(order.created_by_id)
+        user = get_user(order.created_by)
         table.add_row(
             str(order.id),
             order.status,
@@ -105,7 +105,7 @@ def add_order() -> None:
     user = auth_user()
     with conn.transaction():
         order_id = conn.execute(
-            "INSERT INTO sales.orders (warehouse_id, created_by_id) VALUES (%s, %s) RETURNING id",
+            "INSERT INTO sales.orders (warehouse_id, created_by) VALUES (%s, %s) RETURNING id",
             (warehouse_id, user.id),
         ).fetchone()[0]
 
