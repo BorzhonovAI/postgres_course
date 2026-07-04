@@ -8,8 +8,8 @@ from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from commands import command, CATEGORY_PRODUCTS
 from console import console, render_error
 from db import get_conn
-from product_categories import get_product_categories, get_category_name_by_id
-from structures import Product
+from .product_categories import get_product_categories, get_category_name_by_id
+from .structures import Product
 from validators import NonEmptyValidator, YesNoValidator, PriceValidator
 
 
@@ -133,8 +133,12 @@ def show_product(_id: str) -> None:
     _render_product(product)
 
 
-@command("add product", "добавить товар (интерактивно)", CATEGORY_PRODUCTS,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "add product",
+    "добавить товар (интерактивно)",
+    CATEGORY_PRODUCTS,
+    [ROLE_CATALOG_MANAGER],
+)
 def add_product() -> None:
     conn = get_conn()
 
@@ -145,8 +149,7 @@ def add_product() -> None:
     name = prompt("Имя: ", validator=NonEmptyValidator()).strip()
     price = prompt("Цена: ", validator=PriceValidator()).strip()
     category_id = choice(
-        message="Выберите категорию товара:",
-        options=categories_options
+        message="Выберите категорию товара:", options=categories_options
     )
 
     conn.execute(
@@ -161,8 +164,9 @@ def add_product() -> None:
     console.print(f"[green]Товар {name} ({product.id}) добавлен [/green]")
 
 
-@command("edit product", "редактировать товар", CATEGORY_PRODUCTS,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "edit product", "редактировать товар", CATEGORY_PRODUCTS, [ROLE_CATALOG_MANAGER]
+)
 def edit_product(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -176,12 +180,8 @@ def edit_product(_id: str) -> None:
     categories = get_product_categories()
     categories_options = [(cat.id, cat.name) for cat in categories]
 
-    sku = prompt(
-        "SKU: ", default=product.sku, validator=NonEmptyValidator()
-    ).strip()
-    name = prompt(
-        "Имя: ", default=product.name, validator=NonEmptyValidator()
-    ).strip()
+    sku = prompt("SKU: ", default=product.sku, validator=NonEmptyValidator()).strip()
+    name = prompt("Имя: ", default=product.name, validator=NonEmptyValidator()).strip()
     price = prompt(
         "Цена: ", default=str(product.price), validator=PriceValidator()
     ).strip()
@@ -200,8 +200,7 @@ def edit_product(_id: str) -> None:
     console.print(f"[green]Продукт ({name}) обновлен [/green]")
 
 
-@command("delete product", "удалить товар", CATEGORY_PRODUCTS,
-         [ROLE_CATALOG_MANAGER])
+@command("delete product", "удалить товар", CATEGORY_PRODUCTS, [ROLE_CATALOG_MANAGER])
 def delete_product(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Product)) as cur:
@@ -220,7 +219,9 @@ def delete_product(_id: str) -> None:
         try:
             conn.execute("DELETE FROM catalog.products WHERE id = %s", (_id,))
         except Exception:
-            render_error(f"Продукт с ID {_id} не может быть удалён пока на него есть заказ")
+            render_error(
+                f"Продукт с ID {_id} не может быть удалён пока на него есть заказ"
+            )
             return
 
         console.print(f"[green]Продукт {product.name} удален [/green]")
@@ -235,17 +236,20 @@ def products_count() -> int:
     return count[0]
 
 
-@command("delete all products", "удалить все товары", CATEGORY_PRODUCTS,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "delete all products",
+    "удалить все товары",
+    CATEGORY_PRODUCTS,
+    [ROLE_CATALOG_MANAGER],
+)
 def delete_all_products() -> None:
     conn = get_conn()
 
     count = products_count()
-    answer = (prompt
-        (
+    answer = prompt(
         f"Вы собираетесь удалить {count} товаров. Вы уверены? (y/n, д/н): ",
-        validator=YesNoValidator()
-    ))
+        validator=YesNoValidator(),
+    )
 
     if YesNoValidator.is_yes(answer):
         conn.execute("TRUNCATE TABLE catalog.products")

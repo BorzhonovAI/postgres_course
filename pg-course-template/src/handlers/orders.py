@@ -8,11 +8,11 @@ from auth import ROLE_SALES_MANAGER, auth_user
 from commands import command, CATEGORY_ORDERS
 from console import console, render_error
 from db import get_conn
-from order_items import add_order_item
-from structures import Order
+from .order_items import add_order_item
+from .structures import Order
 from users import get_user
 from validators import YesNoValidator
-from warehouses import get_warehouse_full_address, get_warehouses
+from .warehouses import get_warehouse_full_address, get_warehouses, get_city_name
 
 
 def _render_order(order: Order):
@@ -24,11 +24,16 @@ def _render_order(order: Order):
     table.add_row("ID", str(order.id))
     table.add_row("Статус", order.status)
     table.add_row("Суммарная стоимость", str(order.total_amount))
-    table.add_row("Время создания", order.created_at.astimezone().isoformat(timespec='seconds'))
+    table.add_row(
+        "Время создания", order.created_at.astimezone().isoformat(timespec="seconds")
+    )
     address = get_warehouse_full_address(order.warehouse_id)
     table.add_row("Склад", address if len(address) != 0 else "Неизвестно")
     user = get_user(order.created_by_id)
     table.add_row("Владелец", user.username)
+    if order.processing_by is not None:
+        proc_user = get_user(order.processing_by)
+        table.add_row("Обработчик", proc_user.username if proc_user else "Неизвестно")
 
     panel = Panel(
         table,
@@ -40,8 +45,7 @@ def _render_order(order: Order):
     console.print(panel)
 
 
-@command("list orders", "список всех заказов", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command("list orders", "список всех заказов", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
 def list_orders() -> None:
     conn = get_conn()
     table = Table(title="Заказы", show_header=True, header_style="bold cyan")
@@ -64,15 +68,14 @@ def list_orders() -> None:
             str(order.id),
             order.status,
             str(order.total_amount),
-            order.created_at.astimezone().isoformat(timespec='seconds'),
+            order.created_at.astimezone().isoformat(timespec="seconds"),
             address if len(address) != 0 else "Неизвестно",
-            user.username
+            user.username,
         )
     console.print(table)
 
 
-@command("show order", "информация о заказе", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command("show order", "информация о заказе", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
 def show_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -86,18 +89,18 @@ def show_order(_id: str) -> None:
     _render_order(order)
 
 
-@command("add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command(
+    "add order", "добавить заказ (интерактивно)", CATEGORY_ORDERS, [ROLE_SALES_MANAGER]
+)
 def add_order() -> None:
     conn = get_conn()
 
     warehouses = get_warehouses()
-    warehouses_options = [(w.id, f"г. {w.city}, {w.address}") for w in warehouses]
+    warehouses_options = [
+        (w.id, f"г. {get_city_name(w.city_id)}, {w.address}") for w in warehouses
+    ]
 
-    warehouse_id = choice(
-        message="Выберите склад:",
-        options=warehouses_options
-    )
+    warehouse_id = choice(message="Выберите склад:", options=warehouses_options)
 
     user = auth_user()
     with conn.transaction():
@@ -107,8 +110,7 @@ def add_order() -> None:
         ).fetchone()[0]
 
         answer = prompt(
-            "Желаете добавить товары к заказу? (y/n, д/н): ",
-            validator=YesNoValidator()
+            "Желаете добавить товары к заказу? (y/n, д/н): ", validator=YesNoValidator()
         )
         if YesNoValidator.is_yes(answer):
             add_order_item(order_id)
@@ -117,8 +119,7 @@ def add_order() -> None:
     show_order(order_id)
 
 
-@command("edit order", "редактировать заказ", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command("edit order", "редактировать заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
 def edit_order(_id: str) -> None:
     conn = get_conn()
 
@@ -135,12 +136,14 @@ def edit_order(_id: str) -> None:
         return
 
     warehouses = get_warehouses()
-    warehouses_options = [(w.id, f"г. {w.city}, {w.address}") for w in warehouses]
+    warehouses_options = [
+        (w.id, f"г. {get_city_name(w.city_id)}, {w.address}") for w in warehouses
+    ]
 
     warehouse_id = choice(
         message="Выберите склад:",
         options=warehouses_options,
-        default=order.warehouse_id
+        default=order.warehouse_id,
     )
 
     conn.execute(
@@ -151,8 +154,7 @@ def edit_order(_id: str) -> None:
     console.print(f"[green]Заказ #{_id} обновлен [/green]")
 
 
-@command("delete order", "удалить заказ", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command("delete order", "удалить заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
 def delete_order(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Order)) as cur:
@@ -177,8 +179,7 @@ def delete_order(_id: str) -> None:
         console.print(f"[green]Заказ #{_id} удален [/green]")
 
 
-@command("publish order", "опубликовать заказ", CATEGORY_ORDERS,
-         [ROLE_SALES_MANAGER])
+@command("publish order", "опубликовать заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
 def publish_order(_id: str) -> None:
     conn = get_conn()
 

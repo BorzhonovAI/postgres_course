@@ -9,21 +9,26 @@ from db import get_conn
 class ProductCategoryValidator(Validator):
     def validate(self, document):
         from product_categories import ProductCategory
+
         text = document.text.strip()
         if text:
             conn = get_conn()
             with conn.cursor(row_factory=class_row(ProductCategory)) as cur:
-                cur.execute("SELECT * FROM catalog.product_categories WHERE name = %s", (text,))
+                cur.execute(
+                    "SELECT * FROM catalog.product_categories WHERE name = %s", (text,)
+                )
                 category: ProductCategory | None = cur.fetchone()
 
             if category is None:
                 raise ValidationError(
                     message=f"Категория товара с именем {text} не найдена, список всех "
-                            f"категорий товаров можно получить командой list product_categories",
-                    cursor_position=len(text)
+                    f"категорий товаров можно получить командой list product_categories",
+                    cursor_position=len(text),
                 )
         else:
-            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+            raise ValidationError(
+                message="Поле не может быть пустым", cursor_position=0
+            )
 
 
 class PriceValidator(Validator):
@@ -41,7 +46,9 @@ class PriceValidator(Validator):
                     message="Введите число", cursor_position=len(text)
                 ) from e
         else:
-            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+            raise ValidationError(
+                message="Поле не может быть пустым", cursor_position=0
+            )
 
 
 class QuantityValidator(Validator):
@@ -52,14 +59,17 @@ class QuantityValidator(Validator):
                 quantity = int(text)
                 if quantity <= 0:
                     raise ValidationError(
-                        message="Количество должно быть больше 0", cursor_position=len(text)
+                        message="Количество должно быть больше 0",
+                        cursor_position=len(text),
                     )
             except ValueError as e:
                 raise ValidationError(
                     message="Введите число", cursor_position=len(text)
                 ) from e
         else:
-            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+            raise ValidationError(
+                message="Поле не может быть пустым", cursor_position=0
+            )
 
 
 class NonEmptyValidator(Validator):
@@ -90,14 +100,16 @@ class YesNoValidator(Validator):
         if text not in self.ALL_VALUES:
             raise ValidationError(message="Введите y/n (yes/no)")
         elif not text:
-            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+            raise ValidationError(
+                message="Поле не может быть пустым", cursor_position=0
+            )
 
 
 class ChoiceValidator(Validator):
     def __init__(
-            self,
-            choices: list[str],
-            message: str = "Значение должно быть из списка. Используйте Tab для автодополнения.",
+        self,
+        choices: list[str],
+        message: str = "Значение должно быть из списка. Используйте Tab для автодополнения.",
     ):
         self.choices = choices
         self.message = message
@@ -107,4 +119,6 @@ class ChoiceValidator(Validator):
         if text and text not in self.choices:
             raise ValidationError(message=self.message, cursor_position=len(text))
         elif not text:
-            raise ValidationError(message="Поле не может быть пустым", cursor_position=0)
+            raise ValidationError(
+                message="Поле не может быть пустым", cursor_position=0
+            )

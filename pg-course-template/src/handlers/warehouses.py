@@ -1,6 +1,6 @@
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
-from psycopg.rows import class_row
+from psycopg.rows import class_row, scalar_row
 from rich.panel import Panel
 from rich.table import Table
 
@@ -8,43 +8,17 @@ from auth import ALL_ROLES, ROLE_CATALOG_MANAGER
 from commands import command, CATEGORY_WAREHOUSES
 from console import console, render_error
 from db import get_conn
-from structures import Warehouse
+from .structures import Warehouse
 from validators import ChoiceValidator, NonEmptyValidator, YesNoValidator
 
-cities = [
-    "Москва",
-    "Санкт-Петербург",
-    "Новосибирск",
-    "Екатеринбург",
-    "Казань",
-    "Нижний Новгород",
-    "Челябинск",
-    "Самара",
-    "Омск",
-    "Ростов-на-Дону",
-    "Уфа",
-    "Красноярск",
-    "Воронеж",
-    "Пермь",
-    "Волгоград",
-]
 
-city_completer = WordCompleter(cities, ignore_case=True, sentence=True)
-city_validator = ChoiceValidator(
-    cities, message="Город должен быть из списка. Используйте Tab для автодополнения."
-)
-
-
-def get_orders_count_by_warehouse_id(_id: int) -> int:
+def get_cities_names() -> list[str]:
     conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT COUNT(*) FROM sales.orders WHERE warehouse_id = %s AND status = 'unpublished'",
-            (_id,)
-        )
-        orders_count: int = cur.fetchone()[0]
+    with conn.cursor(row_factory=scalar_row) as cur:
+        cur.execute("SELECT name FROM catalog.cities")
+        names_list: list[str] = cur.fetchall()
 
-    return orders_count
+    return names_list
 
 
 def get_warehouse_by_id(_id: int) -> Warehouse | None:
@@ -56,10 +30,29 @@ def get_warehouse_by_id(_id: int) -> Warehouse | None:
     return warehouse
 
 
+def get_city_name(_id: int) -> str:
+    conn = get_conn()
+    with conn.cursor(row_factory=scalar_row) as cur:
+        cur.execute("SELECT name FROM catalog.cities WHERE id = %s", (_id,))
+        name: str = cur.fetchone()
+
+    return name
+
+
+def get_city_id(name: str) -> int:
+    conn = get_conn()
+    with conn.cursor(row_factory=scalar_row) as cur:
+        cur.execute("SELECT id FROM catalog.cities WHERE name = %s", (name,))
+        id_: int = cur.fetchone()
+
+    return id_
+
+
 # Использовать только при полной уверенности в существовании склада
 def get_warehouse_full_address(_id: int) -> str:
     warehouse = get_warehouse_by_id(_id)
-    return f"г. {warehouse.city}, {warehouse.address}"
+    city = get_city_name(warehouse.city_id)
+    return f"г. {city}, {warehouse.address}"
 
 
 def get_warehouses() -> list[Warehouse]:
@@ -78,7 +71,7 @@ def _render_warehouse(warehouse: Warehouse) -> None:
     table.add_column("Значение", style="white")
 
     table.add_row("ID", str(warehouse.id))
-    table.add_row("Город", warehouse.city)
+    table.add_row("Город", get_city_name(warehouse.city_id))
     table.add_row("Адрес", warehouse.address)
     table.add_row("Метка", warehouse.label or "")
     table.add_row("Центральный", "да" if warehouse.is_central else "нет")
@@ -111,7 +104,7 @@ def list_warehouses() -> None:
     for warehouse in warehouses:
         table.add_row(
             str(warehouse.id),
-            warehouse.city,
+            get_city_name(warehouse.city_id),
             warehouse.address,
             warehouse.label or "",
             "да" if warehouse.is_central else "нет",
@@ -146,25 +139,44 @@ def warehouses_empty() -> bool:
     return True if warehouses_count() == 0 else False
 
 
-@command("add warehouse", "добавить склад (интерактивно)", CATEGORY_WAREHOUSES,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "add warehouse",
+    "добавить склад (интерактивно)",
+    CATEGORY_WAREHOUSES,
+    [ROLE_CATALOG_MANAGER],
+)
 def add_warehouse() -> None:
     conn = get_conn()
+
+    cities = get_cities_names()
+    city_completer = WordCompleter(cities, ignore_case=True, sentence=True)
+    city_validator = ChoiceValidator(
+        cities,
+        message="Город должен быть из списка. Используйте Tab для автодополнения.",
+    )
+
     city = prompt("Город: ", validator=city_validator, completer=city_completer).strip()
+    city_id = get_city_id(city)
     address = prompt("Адрес: ", validator=NonEmptyValidator()).strip()
     label = prompt("Метка (необязательно): ").strip() or None
 
     if warehouses_empty():
         is_central = True
     else:
-        is_central = YesNoValidator.is_yes(prompt("Центральный: ", validator=YesNoValidator()).strip())
+        is_central = YesNoValidator.is_yes(
+            prompt("Центральный: ", validator=YesNoValidator()).strip()
+        )
         if is_central:
-            console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен.")
-            conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
+            console.log(
+                "[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен."
+            )
+            conn.execute(
+                "UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE"
+            )
 
     conn.execute(
-        "INSERT INTO catalog.warehouses (city, address, label, is_central) VALUES (%s, %s, %s, %s)",
-        (city, address, label, is_central)
+        "INSERT INTO catalog.warehouses (city_id, address, label, is_central) VALUES (%s, %s, %s, %s)",
+        (city_id, address, label, is_central),
     )
 
     if label:
@@ -173,8 +185,9 @@ def add_warehouse() -> None:
         console.print(f"[green]Склад в городе {city} добавлен [/green]")
 
 
-@command("edit warehouse", "редактировать склад", CATEGORY_WAREHOUSES,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "edit warehouse", "редактировать склад", CATEGORY_WAREHOUSES, [ROLE_CATALOG_MANAGER]
+)
 def edit_warehouse(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Warehouse)) as cur:
@@ -185,33 +198,45 @@ def edit_warehouse(_id: str) -> None:
         render_error(f"Склад с ID {_id} не найден")
         return
 
+    cities = get_cities_names()
+    city_completer = WordCompleter(cities, ignore_case=True, sentence=True)
+    city_validator = ChoiceValidator(
+        cities,
+        message="Город должен быть из списка. Используйте Tab для автодополнения.",
+    )
+
     city = prompt(
         "Город: ",
-        default=warehouse.city,
+        default=get_city_name(warehouse.city_id),
         validator=city_validator,
         completer=city_completer,
     ).strip()
+    city_id = get_city_id(city)
     address = prompt(
         "Адрес: ", default=warehouse.address, validator=NonEmptyValidator()
     ).strip()
     label = (
-            prompt("Метка (необязательно): ", default=warehouse.label or "").strip() or None
+        prompt("Метка (необязательно): ", default=warehouse.label or "").strip() or None
     )
     if not warehouse.is_central:
-        is_central = YesNoValidator.is_yes(prompt(
-            "Центральный: ", default="нет", validator=YesNoValidator()
-        ).strip())
+        is_central = YesNoValidator.is_yes(
+            prompt("Центральный: ", default="нет", validator=YesNoValidator()).strip()
+        )
     else:
         is_central = False
 
     if is_central:
-        console.log("[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен")
-        conn.execute("UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE")
+        console.log(
+            "[yellow bold]Предупреждение:[/bold yellow]: Центральный склад переназначен"
+        )
+        conn.execute(
+            "UPDATE catalog.warehouses SET is_central = FALSE WHERE is_central = TRUE"
+        )
 
     conn.execute(
-        """UPDATE catalog.warehouses SET city = %s, address = %s, label = %s, is_central = %s
+        """UPDATE catalog.warehouses SET city_id = %s, address = %s, label = %s, is_central = %s
         WHERE id = %s""",
-        (city, address, label, is_central, _id),
+        (city_id, address, label, is_central, _id),
     )
 
     if label:
@@ -220,8 +245,9 @@ def edit_warehouse(_id: str) -> None:
         console.print(f"[green]Склад в городе {city} обновлен [/green]")
 
 
-@command("delete warehouse", "удалить склад", CATEGORY_WAREHOUSES,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "delete warehouse", "удалить склад", CATEGORY_WAREHOUSES, [ROLE_CATALOG_MANAGER]
+)
 def delete_warehouse(_id: str) -> None:
     conn = get_conn()
     with conn.cursor(row_factory=class_row(Warehouse)) as cur:
@@ -234,13 +260,10 @@ def delete_warehouse(_id: str) -> None:
 
     _render_warehouse(warehouse)
     if warehouse.is_central and warehouses_count() > 1:
-        render_error(f"Этот склад является центральным, если вы хотите удалить его, сначала назначьте другой "
-                     f"центральный склад")
-        return
-
-    count = get_orders_count_by_warehouse_id(int(_id))
-    if count != 0:
-        render_error("Нельзя удалить склад пока на нем есть заказы")
+        render_error(
+            f"Этот склад является центральным, если вы хотите удалить его,"
+            f" сначала назначьте другой центральный склад"
+        )
         return
 
     answer = prompt("Вы уверены? (y/n, д/н): ", validator=YesNoValidator())
@@ -250,24 +273,30 @@ def delete_warehouse(_id: str) -> None:
 
         if warehouse.label:
             console.print(
-                f"[green]Склад в городе {warehouse.city} ({warehouse.label}) удален [/green]"
+                f"[green]Склад в городе {get_city_name(warehouse.city_id)} "
+                f"({warehouse.label}) удален [/green]"
             )
         else:
-            console.print(f"[green]Склад в городе {warehouse.city} удален [/green]")
+            console.print(
+                f"[green]Склад в городе {get_city_name(warehouse.city_id)} удален [/green]"
+            )
 
 
-@command("delete all warehouses", "удалить все категории товаров", CATEGORY_WAREHOUSES,
-         [ROLE_CATALOG_MANAGER])
+@command(
+    "delete all warehouses",
+    "удалить все категории товаров",
+    CATEGORY_WAREHOUSES,
+    [ROLE_CATALOG_MANAGER],
+)
 def delete_all_warehouses() -> None:
     conn = get_conn()
 
     count = warehouses_count()
 
-    answer = (prompt
-        (
+    answer = prompt(
         f"Вы собираетесь удалить {count} складов. Вы уверены? (y/n, д/н): ",
-        validator=YesNoValidator()
-    ))
+        validator=YesNoValidator(),
+    )
 
     if YesNoValidator.is_yes(answer):
         conn.execute("TRUNCATE TABLE catalog.warehouses")

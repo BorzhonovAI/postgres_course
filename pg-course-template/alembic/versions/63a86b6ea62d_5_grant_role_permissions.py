@@ -1,8 +1,8 @@
-"""[3]: add schema sales, add tables sales.orders and sales.order_items
+"""[5]: grant role permissions
 
-Revision ID: 2117aa704145
-Revises: cd9c239e42b4
-Create Date: 2026-06-09 21:45:40.982586
+Revision ID: 63a86b6ea62d
+Revises: 0cec3b4e0cf0
+Create Date: 2026-06-27 21:07:30.304607
 
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "2117aa704145"
-down_revision: Union[str, None] = "8e5024d6a191"
+revision: str = "63a86b6ea62d"
+down_revision: Union[str, None] = "0cec3b4e0cf0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,8 +1,8 @@
-"""[3]: add schema sales, add tables sales.orders and sales.order_items
+"""[5]: add cities, inventory schema and all tables
 
-Revision ID: 2117aa704145
-Revises: cd9c239e42b4
-Create Date: 2026-06-09 21:45:40.982586
+Revision ID: 0cec3b4e0cf0
+Revises: 01e6fb5c903e
+Create Date: 2026-06-27 21:07:21.655248
 
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "2117aa704145"
-down_revision: Union[str, None] = "8e5024d6a191"
+revision: str = "0cec3b4e0cf0"
+down_revision: Union[str, None] = "01e6fb5c903e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

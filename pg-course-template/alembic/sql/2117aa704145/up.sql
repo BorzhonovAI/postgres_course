@@ -6,7 +6,7 @@ create table sales.orders (
         created_at timestamp NOT NULL DEFAULT current_timestamp,
         warehouse_id integer NOT NULL REFERENCES catalog.warehouses (id),
         CONSTRAINT status_check
-        CHECK( status in ('unpublished', 'new', 'processing', 'new', 'pending', 'packing', 'shipped'))
+        CHECK( status in ('unpublished', 'new', 'processing', 'pending', 'packing', 'shipped'))
 );
 create table sales.order_items (
         order_id int NOT NULL REFERENCES sales.orders (id) ON DELETE CASCADE,
