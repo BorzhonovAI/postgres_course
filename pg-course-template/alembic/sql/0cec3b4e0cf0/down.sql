@@ -20,6 +20,7 @@ ALTER TABLE "catalog".warehouses DROP CONSTRAINT warehouses_cities_fk;
 
 -- восстановить текстовый город из cities (пока таблица ещё существует)
 ALTER TABLE "catalog".warehouses ADD COLUMN city text;
+ALTER TABLE "catalog".warehouses ALTER COLUMN city_id DROP NOT NULL;
 UPDATE "catalog".warehouses w
 SET city = c."name"
 FROM "catalog".cities c

@@ -19,6 +19,7 @@ UPDATE "catalog".warehouses w
 SET city_id = c.id
 FROM "catalog".cities c
 WHERE c."name" = w.city;
+ALTER TABLE "catalog".warehouses ALTER COLUMN city_id SET NOT NULL;
 ALTER TABLE "catalog".warehouses DROP COLUMN city;
 ALTER TABLE "catalog".warehouses ADD
     CONSTRAINT warehouses_cities_fk FOREIGN KEY (city_id) REFERENCES "catalog".cities(id);
