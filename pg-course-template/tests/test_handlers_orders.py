@@ -74,8 +74,9 @@ class TestShowOrder:
                     mock_prod.return_value = MagicMock(id=10, name="Тестовый товар", sku="SKU-001")
                     with patch("handlers.orders.console") as mock_console:
                         orders.show_order("1")
-                        # console.print called for the order + items table
-                        assert mock_console.print.call_count >= 2
+                        # console.print called once for the items table
+                        # (_render_order is patched so doesn't print)
+                        assert mock_console.print.call_count >= 1
 
 
 
@@ -817,8 +818,9 @@ class TestGetItemStatus:
         item = OrderItem(order_id=2, product_id=10, quantity=5, price=Decimal("20"))
 
         mock_cursor = mock_db.cursor.return_value
-        # reserve has quantity=3 which is < 5
-        mock_cursor.fetchone.side_effect = [(3,), None, None]
+        # First query: SELECT quantity WHERE quantity >= 5 — reserve=3 doesn't match → None
+        # Second query: transfer check — no matching transfer → None
+        mock_cursor.fetchone.side_effect = [None, None, None]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import orders  # noqa: F811
@@ -861,17 +863,13 @@ class TestGetItemStatus:
         mock_cursor.fetchone.side_effect = [None, transfer_row]
 
         with patch("db.get_conn", return_value=mock_db):
-            with patch("handlers.orders.get_item_status"):
-                from handlers import orders  # noqa: F811
-                # need to reload to pick up patches... actually let's just call directly
-                # First reset modules so import is fresh
-                import sys
-                for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
-                    del sys.modules[mod]
-                from handlers import orders as orders2  # noqa: F811
-                status = orders2._get_item_status(order, item)
-                assert "в пути" in status
-                assert "из склада #1" in status
+            import sys
+            for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
+                del sys.modules[mod]
+            from handlers import orders as orders2  # noqa: F811
+            status = orders2._get_item_status(order, item)
+            assert "в пути" in status
+            assert "из склада #1" in status
 
     def test_in_transit_without_arriving_at(self, mock_db, mock_user):
         """Active transfer without arriving_at → 'в пути' without date."""
