@@ -15,7 +15,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE app_user IN SCHEMA inventory GRANT ALL ON SEQU
 GRANT USAGE ON SCHEMA sales TO inventory_manager;
 GRANT SELECT ON TABLE sales.orders TO inventory_manager;
 GRANT SELECT ON TABLE sales.order_items TO inventory_manager;
-GRANT UPDATE(status) ON sales.orders TO inventory_manager;
+GRANT UPDATE(status, processing_by) ON sales.orders TO inventory_manager;
 
 -- ===== worker grants =====
 
