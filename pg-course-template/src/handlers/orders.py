@@ -462,6 +462,8 @@ def delete_order(_id: str) -> None:
         conn.execute("DELETE FROM sales.orders WHERE id = %s", (_id,))
 
         console.print(f"[green]Заказ #{_id} удален [/green]")
+    else:
+        console.print("[yellow]Отменено[/yellow]")
 
 
 @command("publish order", "опубликовать заказ", CATEGORY_ORDERS, [ROLE_SALES_MANAGER])
