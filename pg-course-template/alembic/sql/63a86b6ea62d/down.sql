@@ -1,3 +1,8 @@
+-- undo: sales_manager: read access to inventory
+
+REVOKE SELECT ON ALL TABLES IN SCHEMA inventory FROM sales_manager;
+REVOKE USAGE ON SCHEMA inventory FROM sales_manager;
+
 -- undo: worker grants
 
 REVOKE USAGE ON SCHEMA inventory FROM worker;

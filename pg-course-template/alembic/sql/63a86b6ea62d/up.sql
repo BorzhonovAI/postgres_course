@@ -4,6 +4,11 @@ GRANT USAGE ON SCHEMA auth TO PUBLIC;
 GRANT SELECT ON ALL TABLES IN SCHEMA auth TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO PUBLIC;
 
+-- ===== sales_manager: read access to inventory for show order =====
+
+GRANT USAGE ON SCHEMA inventory TO sales_manager;
+GRANT SELECT ON ALL TABLES IN SCHEMA inventory TO sales_manager;
+
 -- ===== inventory_manager grants =====
 
 GRANT CREATE, USAGE ON SCHEMA inventory TO inventory_manager;
