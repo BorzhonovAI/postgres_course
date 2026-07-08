@@ -21,14 +21,18 @@ class TestViewWarehouseStock:
                     MagicMock(id=1, city_id=1, address="ул. Тест, 1"),
                     MagicMock(id=2, city_id=2, address="ул. Другая, 5"),
                 ]
-                with patch("handlers.stock.get_city_name", side_effect=["Москва", "СПб"]):
+                with patch(
+                    "handlers.stock.get_city_name", side_effect=["Москва", "СПб"]
+                ):
                     with patch("handlers.stock.choice", return_value=1) as mock_choice:
                         with patch("handlers.stock.console"):
                             stock.view_warehouse_stock()
                             mock_choice.assert_called_once()
                             # options should be [(id, label), ...]
                             _, kwargs = mock_choice.call_args
-                            options = kwargs.get("options") or mock_choice.call_args[0][1]
+                            options = (
+                                kwargs.get("options") or mock_choice.call_args[0][1]
+                            )
                             assert (1, "г. Москва, ул. Тест, 1") in options
                             assert (2, "г. СПб, ул. Другая, 5") in options
 
@@ -36,15 +40,17 @@ class TestViewWarehouseStock:
         """Stock table is rendered when warehouse has items."""
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchall.return_value = [
-            ("Ноутбук", "NB-001", 10),
-            ("Мышь", "MS-002", 50),
+            ("Ноутбук", "NB-001", 10, 0, 10),
+            ("Мышь", "MS-002", 50, 5, 55),
         ]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import stock  # noqa: F811
 
             with patch("handlers.stock.get_warehouses") as mock_whs:
-                mock_whs.return_value = [MagicMock(id=1, city_id=1, address="ул. Тест, 1")]
+                mock_whs.return_value = [
+                    MagicMock(id=1, city_id=1, address="ул. Тест, 1")
+                ]
                 with patch("handlers.stock.get_city_name", return_value="Москва"):
                     with patch("handlers.stock.choice", return_value=1):
                         with patch("handlers.stock.console") as mock_console:
@@ -60,13 +66,17 @@ class TestViewWarehouseStock:
             from handlers import stock  # noqa: F811
 
             with patch("handlers.stock.get_warehouses") as mock_whs:
-                mock_whs.return_value = [MagicMock(id=1, city_id=1, address="ул. Тест, 1")]
+                mock_whs.return_value = [
+                    MagicMock(id=1, city_id=1, address="ул. Тест, 1")
+                ]
                 with patch("handlers.stock.get_city_name", return_value="Москва"):
                     with patch("handlers.stock.choice", return_value=1):
                         with patch("handlers.stock.render_error") as mock_error:
                             stock.view_warehouse_stock()
                             mock_error.assert_called_once()
-                            assert "нет запасов" in mock_error.call_args[0][0]
+                            assert (
+                                "В каталоге нет товаров" in mock_error.call_args[0][0]
+                            )
 
     def test_queries_inventory_stock_with_warehouse_filter(self, mock_db):
         """SQL should filter by warehouse_id and JOIN products."""
@@ -115,7 +125,7 @@ class TestViewWarehouseStock:
     def test_table_has_product_and_quantity_columns(self, mock_db):
         """Rendered table should have product (name+sku) and quantity columns."""
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchall.return_value = [("Тест", "SKU-1", 5)]
+        mock_cursor.fetchall.return_value = [("Тест", "SKU-1", 5, 0, 5)]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import stock  # noqa: F811
@@ -148,7 +158,9 @@ class TestViewProductStock:
                     with patch("handlers.stock.console"):
                         stock.view_product_stock()
                         # prompt should have been called with "Имя товара: "
-                        prompt_calls = [c for c in mock_gps().__iter__()]  # just check it ran
+                        prompt_calls = [
+                            c for c in mock_gps().__iter__()
+                        ]  # just check it ran
                         # The key thing: prompt was called
                         # We'll check via a different approach
                         pass
@@ -157,8 +169,8 @@ class TestViewProductStock:
         """Product selection leads to stock query across warehouses."""
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchall.return_value = [
-            (1, "ул. Тест, 1", 10),
-            (2, "ул. Другая, 5", 3),
+            (1, "ул. Тест, 1", 10, 0, 10),
+            (2, "ул. Другая, 5", 3, 1, 4),
         ]
 
         with patch("db.get_conn", return_value=mock_db):
@@ -169,7 +181,9 @@ class TestViewProductStock:
                     MagicMock(id=1, name="Ноутбук", sku="NB-001"),
                 ]
                 with patch("handlers.stock.prompt", return_value="Ноутбук (NB-001)"):
-                    with patch("handlers.stock.get_city_name", side_effect=["Москва", "СПб"]):
+                    with patch(
+                        "handlers.stock.get_city_name", side_effect=["Москва", "СПб"]
+                    ):
                         with patch("handlers.stock.console") as mock_console:
                             stock.view_product_stock()
                             assert mock_console.print.called
@@ -242,7 +256,7 @@ class TestViewProductStock:
     def test_table_has_warehouse_and_quantity_columns(self, mock_db):
         """Rendered table should have warehouse address and quantity."""
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchall.return_value = [(1, "ул. Тест, 1", 7)]
+        mock_cursor.fetchall.return_value = [(1, "ул. Тест, 1", 7, 2, 9)]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import stock  # noqa: F811
