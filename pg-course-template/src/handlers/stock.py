@@ -28,20 +28,37 @@ def view_warehouse_stock() -> None:
 
     warehouse_id = choice(message="Выберите склад:", options=warehouses_options)
 
-    # Таблица запасов
+    # Таблица запасов: сток, резерв, общее
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT p.name, p.sku, s.quantity
-               FROM inventory.stock s
-               JOIN catalog.products p ON s.product_id = p.id
-               WHERE s.warehouse_id = %s
-               ORDER BY p.name""",
+            """WITH base AS (
+                   SELECT p.name, p.sku,
+                          COALESCE(SUM(s.quantity), 0) AS stock_qty,
+                          COALESCE((
+                              SELECT SUM(r.quantity)
+                              FROM inventory.reserves r
+                              WHERE r.product_id = p.id
+                                AND r.order_id IN (
+                                    SELECT o.id
+                                    FROM sales.orders o
+                                    WHERE o.status NOT IN ('shipped', 'new')
+                                )
+                          ), 0) AS reserve_qty
+                     FROM catalog.products p
+                     LEFT JOIN inventory.stock s ON s.product_id = p.id
+                                                AND s.warehouse_id = %s
+                    GROUP BY p.id, p.name, p.sku
+               )
+              SELECT name, sku, stock_qty, reserve_qty,
+                     stock_qty + reserve_qty AS total_qty
+                FROM base
+               ORDER BY name""",
             (warehouse_id,),
         )
         stocks = cur.fetchall()
 
     if not stocks:
-        render_error(f"На складе #{warehouse_id} нет запасов")
+        render_error("В каталоге нет товаров")
         return
 
     table = Table(
@@ -50,10 +67,17 @@ def view_warehouse_stock() -> None:
         header_style="bold cyan",
     )
     table.add_column("Товар", style="yellow", min_width=25)
-    table.add_column("Остаток", style="red", min_width=10, justify="right")
+    table.add_column("Сток", style="green", min_width=10, justify="right")
+    table.add_column("Резерв", style="magenta", min_width=10, justify="right")
+    table.add_column("Общее", style="red", min_width=10, justify="right")
 
-    for product_name, sku, quantity in stocks:
-        table.add_row(f"{product_name} ({sku})", str(quantity))
+    for product_name, sku, stock_qty, reserve_qty, total_qty in stocks:
+        table.add_row(
+            f"{product_name} ({sku})",
+            str(stock_qty),
+            str(reserve_qty),
+            str(total_qty),
+        )
 
     console.print(table)
 
@@ -84,15 +108,32 @@ def view_product_stock() -> None:
     # Извлекаем sku из строки "{name} ({sku})"
     sku = product_name_with_sku.split("(")[-1].rstrip(")")
 
-    # Таблица остатков по складам
+    # Таблица остатков по складам: сток, резерв, общее
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT w.city_id, w.address, s.quantity
-               FROM inventory.stock s
-               JOIN catalog.products p ON s.product_id = p.id
-               JOIN catalog.warehouses w ON s.warehouse_id = w.id
-               WHERE p.sku = %s
-               ORDER BY w.city_id""",
+            """WITH base AS (
+                   SELECT w.city_id, w.address,
+                          COALESCE(SUM(s.quantity), 0) AS stock_qty,
+                          COALESCE((
+                              SELECT SUM(r.quantity)
+                              FROM inventory.reserves r
+                              WHERE r.product_id = p.id
+                                AND r.order_id IN (
+                                    SELECT o.id
+                                    FROM sales.orders o
+                                    WHERE o.status NOT IN ('shipped', 'new')
+                                )
+                          ), 0) AS reserve_qty
+                     FROM inventory.stock s
+                     JOIN catalog.products p ON s.product_id = p.id
+                     JOIN catalog.warehouses w ON s.warehouse_id = w.id
+                    WHERE p.sku = %s
+                    GROUP BY w.id, w.city_id, w.address
+               )
+              SELECT city_id, address, stock_qty, reserve_qty,
+                     stock_qty + reserve_qty AS total_qty
+                FROM base
+               ORDER BY stock_qty DESC""",
             (sku,),
         )
         stocks = cur.fetchall()
@@ -107,13 +148,17 @@ def view_product_stock() -> None:
         header_style="bold cyan",
     )
     table.add_column("Склад", style="magenta", min_width=30)
-    table.add_column("Остаток", style="red", min_width=10, justify="right")
+    table.add_column("Сток", style="green", min_width=10, justify="right")
+    table.add_column("Резерв", style="magenta", min_width=10, justify="right")
+    table.add_column("Общее", style="red", min_width=10, justify="right")
 
-    for city_id, address, quantity in stocks:
+    for city_id, address, stock_qty, reserve_qty, total_qty in stocks:
         full_address = f"г. {get_city_name(city_id)}, {address}"
         table.add_row(
             full_address,
-            str(quantity),
+            str(stock_qty),
+            str(reserve_qty),
+            str(total_qty),
         )
 
     console.print(table)
