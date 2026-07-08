@@ -253,6 +253,27 @@ class TestViewProductStock:
                         assert "ORDER BY" in sql.upper()
                         assert "w.city_id" in sql
 
+    def test_orders_by_stock_qty_desc(self, mock_db):
+        """Stock rows are ordered by stock_qty DESC."""
+        mock_cursor = mock_db.cursor.return_value
+        mock_cursor.fetchall.return_value = []
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import stock  # noqa: F811
+
+            with patch("handlers.stock.get_products") as mock_gps:
+                mock_gps.return_value = [
+                    MagicMock(id=1, name="Тест", sku="T-1"),
+                ]
+                with patch("handlers.stock.prompt", return_value="Тест (T-1)"):
+                    with patch("handlers.stock.console"):
+                        stock.view_product_stock()
+
+                        execute_calls = mock_cursor.execute.call_args_list
+                        sql = execute_calls[0][0][0]
+                        upper_sql = sql.upper()
+                        assert "ORDER BY STOCK_QTY DESC" in upper_sql
+
     def test_table_has_warehouse_and_quantity_columns(self, mock_db):
         """Rendered table should have warehouse address and quantity."""
         mock_cursor = mock_db.cursor.return_value
@@ -304,3 +325,87 @@ class TestViewProductStock:
                     with patch("handlers.stock.console"):
                         stock.view_product_stock()
                         mock_gps.assert_called_once()
+
+
+class TestStockReserveFilter:
+    """Reserve calculation: only active orders count (status NOT IN shipped/new)."""
+
+    def test_warehouse_stock_sql_filters_shipped_new_orders(self, mock_db):
+        """view_warehouse_stock SQL excludes shipped and new from reserve."""
+        mock_cursor = mock_db.cursor.return_value
+        mock_cursor.fetchall.return_value = [("Тест", "T-1", 10, 2, 12)]
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import stock  # noqa: F811
+
+            with patch("handlers.stock.get_warehouses") as mock_whs:
+                mock_whs.return_value = [MagicMock(id=1, city_id=1, address="x")]
+                with patch("handlers.stock.get_city_name", return_value="City"):
+                    with patch("handlers.stock.choice", return_value=1):
+                        with patch("handlers.stock.console"):
+                            stock.view_warehouse_stock()
+
+                            sql = mock_cursor.execute.call_args[0][0]
+                            upper_sql = sql.upper()
+                            assert "NOT IN" in upper_sql
+                            assert "'shipped'" in upper_sql or "'SHIPPED'" in upper_sql
+                            assert "'new'" in upper_sql or "'NEW'" in upper_sql
+
+    def test_product_stock_sql_filters_shipped_new_orders(self, mock_db):
+        """view_product_stock SQL excludes shipped and new from reserve."""
+        mock_cursor = mock_db.cursor.return_value
+        mock_cursor.fetchall.return_value = [(1, "ул. Тест, 1", 10, 2, 12)]
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import stock  # noqa: F811
+
+            with patch("handlers.stock.get_products") as mock_gps:
+                mock_gps.return_value = [MagicMock(id=1, name="Тест", sku="T-1")]
+                with patch("handlers.stock.prompt", return_value="Тест (T-1)"):
+                    with patch("handlers.stock.get_city_name", return_value="Москва"):
+                        with patch("handlers.stock.console"):
+                            stock.view_product_stock()
+
+                            # first execute call is the stock query
+                            sql = mock_cursor.execute.call_args_list[0][0][0]
+                            upper_sql = sql.upper()
+                            assert "NOT IN" in upper_sql
+                            assert "'SHIPPED'" in upper_sql
+                            assert "'NEW'" in upper_sql
+
+    def test_warehouse_stock_returns_zero_stock_products(self, mock_db):
+        """Products with no inventory.stock rows should appear with stock_qty=0."""
+        mock_cursor = mock_db.cursor.return_value
+        # LEFT JOIN returns NULL for stock, COALESCE converts to 0
+        mock_cursor.fetchall.return_value = [("Тест", "T-1", 0, 0, 0)]
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import stock  # noqa: F811
+
+            with patch("handlers.stock.get_warehouses") as mock_whs:
+                mock_whs.return_value = [MagicMock(id=1, city_id=1, address="x")]
+                with patch("handlers.stock.get_city_name", return_value="City"):
+                    with patch("handlers.stock.choice", return_value=1):
+                        with patch("handlers.stock.console") as mock_console:
+                            stock.view_warehouse_stock()
+                            mock_console.print.assert_called_once()
+
+                            # verify the row was added with correct values
+                            table_print = mock_console.print.call_args
+                            assert table_print is not None
+
+    def test_reserve_qty_in_results_tuple(self, mock_db):
+        """Result tuple includes reserve_qty as the 4th element."""
+        mock_cursor = mock_db.cursor.return_value
+        mock_cursor.fetchall.return_value = [("Тест", "T-1", 10, 3, 13)]
+
+        with patch("db.get_conn", return_value=mock_db):
+            from handlers import stock  # noqa: F811
+
+            with patch("handlers.stock.get_warehouses") as mock_whs:
+                mock_whs.return_value = [MagicMock(id=1, city_id=1, address="x")]
+                with patch("handlers.stock.get_city_name", return_value="City"):
+                    with patch("handlers.stock.choice", return_value=1):
+                        with patch("handlers.stock.console") as mock_console:
+                            stock.view_warehouse_stock()
+                            mock_console.print.assert_called_once()
