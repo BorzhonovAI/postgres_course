@@ -1,3 +1,8 @@
+-- undo: sales_manager: read access to inventory
+
+REVOKE SELECT ON ALL TABLES IN SCHEMA inventory FROM sales_manager;
+REVOKE USAGE ON SCHEMA inventory FROM sales_manager;
+
 -- undo: worker grants
 
 REVOKE USAGE ON SCHEMA inventory FROM worker;
@@ -25,7 +30,7 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA inventory FROM inventory_manager;
 REVOKE USAGE ON SCHEMA sales FROM inventory_manager;
 REVOKE SELECT ON TABLE sales.orders FROM inventory_manager;
 REVOKE SELECT ON TABLE sales.order_items FROM inventory_manager;
-REVOKE UPDATE (status) ON sales.orders FROM inventory_manager;
+REVOKE UPDATE (status, processing_by) ON sales.orders FROM inventory_manager;
 
 -- undo: auth schema PUBLIC grants
 

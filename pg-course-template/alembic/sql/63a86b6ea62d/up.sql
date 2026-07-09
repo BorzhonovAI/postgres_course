@@ -4,6 +4,11 @@ GRANT USAGE ON SCHEMA auth TO PUBLIC;
 GRANT SELECT ON ALL TABLES IN SCHEMA auth TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO PUBLIC;
 
+-- ===== sales_manager: read access to inventory for show order =====
+
+GRANT USAGE ON SCHEMA inventory TO sales_manager;
+GRANT SELECT ON ALL TABLES IN SCHEMA inventory TO sales_manager;
+
 -- ===== inventory_manager grants =====
 
 GRANT CREATE, USAGE ON SCHEMA inventory TO inventory_manager;
@@ -15,7 +20,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE app_user IN SCHEMA inventory GRANT ALL ON SEQU
 GRANT USAGE ON SCHEMA sales TO inventory_manager;
 GRANT SELECT ON TABLE sales.orders TO inventory_manager;
 GRANT SELECT ON TABLE sales.order_items TO inventory_manager;
-GRANT UPDATE(status) ON sales.orders TO inventory_manager;
+GRANT UPDATE(status, processing_by) ON sales.orders TO inventory_manager;
 
 -- ===== worker grants =====
 
