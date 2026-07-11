@@ -115,13 +115,27 @@ CREATE TABLE inventory.transfer_items (
     reserve_id int NULL,  -- reserve_id может быть NULL, т.к. не каждый transfer_item привязан к резерву
     status text DEFAULT 'planned' NOT NULL,
     CONSTRAINT transfer_items_pk PRIMARY KEY (id),
-    CONSTRAINT transfer_items_quantity_check CHECK (quantity >= 0),
+    CONSTRAINT transfer_items_quantity_check CHECK (quantity > 0),
     CONSTRAINT transfer_items_status_check CHECK (status IN ('planned', 'shipped', 'received')),
     CONSTRAINT transfer_items_transfer_fk FOREIGN KEY (transfer_id) REFERENCES inventory.transfers(id),
     CONSTRAINT transfer_items_product_fk FOREIGN KEY (product_id) REFERENCES "catalog".products(id),
     CONSTRAINT transfer_items_requested_by_fk FOREIGN KEY (requested_by) REFERENCES auth.users(id),
     CONSTRAINT transfer_items_reserve_fk FOREIGN KEY (reserve_id) REFERENCES inventory.reserves(id)
 );
+
+-- Единственная planned накладная на пару складов
+CREATE UNIQUE INDEX transfers_single_planned_per_route
+  ON inventory.transfers (from_warehouse_id, to_warehouse_id)
+  WHERE status = 'planned';
+
+-- Единственный item по кортежу (transfer_id, product_id, requested_by)
+CREATE UNIQUE INDEX transfer_items_uniq_null_reserve
+  ON inventory.transfer_items (transfer_id, product_id, requested_by)
+  WHERE reserve_id IS NULL;
+
+CREATE UNIQUE INDEX transfer_items_uniq_not_null_reserve
+  ON inventory.transfer_items (transfer_id, product_id, requested_by, reserve_id)
+  WHERE reserve_id IS NOT NULL;
 
 -- ===== processing_by on sales.orders =====
 
