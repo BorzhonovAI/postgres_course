@@ -291,7 +291,23 @@ class TestAddOrderItem:
                         mock_error.assert_called_once()
                         assert "Нет товаров" in mock_error.call_args[0][0]
 
-    def test_inserts_item_and_updates_total(self, mock_db, mock_user):
+    @patch("handlers.order_items.console")
+    @patch("handlers.order_items.YesNoValidator")
+    @patch("handlers.order_items.prompt", side_effect=["Товар (S5)", "2", "нет"])
+    @patch("handlers.order_items.get_product_by_sku")
+    @patch("handlers.order_items.get_order_items")
+    @patch("handlers.order_items.get_products")
+    def test_inserts_item_and_updates_total(
+        self,
+        mock_products,
+        mock_items,
+        mock_product_by_sku,
+        mock_prompt,
+        mock_ynn,
+        mock_console,
+        mock_db,
+        mock_user,
+    ):
         from handlers.structures import Order, Product
         from datetime import datetime
         from decimal import Decimal
@@ -305,17 +321,15 @@ class TestAddOrderItem:
             created_by_id=1,
         )
 
+        from handlers.structures import OrderItem
+
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchone.side_effect = [order_data, (1, 1, 2, Decimal("25"))]
-        # Second fetchone for get_order_by_id (UPDATE total_amount after)
-        mock_cursor.fetchone.return_value = Order(
-            id=1,
-            status="unpublished",
-            total_amount=Decimal("150"),
-            created_at=datetime.now(),
-            warehouse_id=1,
-            created_by_id=1,
-        )
+        mock_cursor.execute.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [
+            OrderItem(
+                order_id=1, product_id=5, quantity=2, price=Decimal("25")
+            ),  # INSERT RETURNING *
+        ]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import order_items  # noqa: F811
@@ -325,36 +339,39 @@ class TestAddOrderItem:
             mock_tx.__exit__ = MagicMock(return_value=False)
             mock_db.transaction = MagicMock(return_value=mock_tx)
 
-            with patch("handlers.order_items.get_products") as mock_products:
+            # Patch get_order_by_id directly — check_order() and line 136
+            # both call it, and they use conn.cursor().fetchone() which would
+            # consume the side_effect list meant for the INSERT RETURNING.
+            with patch("handlers.order_items.get_order_by_id", return_value=order_data):
                 mock_products.return_value = [
-                    Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1)
+                    Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1),
                 ]
-                with patch("handlers.order_items.get_order_items") as mock_items:
-                    mock_items.return_value = []
-                    with patch("handlers.order_items.prompt", side_effect=["Товар (S5)", "2"]):
-                        with patch("handlers.order_items.YesNoValidator") as mock_ynn:
-                            mock_ynn.is_yes = MagicMock(side_effect=[False])
-                            with patch("handlers.order_items.console"):
-                                order_items.add_order_item(1)
+                mock_product_by_sku.return_value = Product(
+                    id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1
+                )
+                mock_items.return_value = []
+                mock_ynn.is_yes = MagicMock(side_effect=[False])
 
-                                # INSERT executed
-                                insert_calls = [
-                                    c
-                                    for c in mock_db.execute.call_args_list
-                                    if "INSERT" in c[0][0]
-                                ]
-                                assert len(insert_calls) >= 1
+                order_items.add_order_item(1)
 
-                                # UPDATE total_amount executed
-                                update_total_calls = [
-                                    c
-                                    for c in mock_db.execute.call_args_list
-                                    if "UPDATE sales.orders SET total_amount" in c[0][0]
-                                ]
-                                assert len(update_total_calls) >= 1
+            # INSERT executed on cursor
+            insert_calls = [
+                c
+                for c in mock_cursor.execute.call_args_list
+                if "INSERT" in c[0][0]
+            ]
+            assert len(insert_calls) >= 1
+
+            # UPDATE total_amount executed on db
+            update_total_calls = [
+                c
+                for c in mock_db.execute.call_args_list
+                if "UPDATE sales.orders SET total_amount" in c[0][0]
+            ]
+            assert len(update_total_calls) >= 1
 
     def test_recurses_when_user_wants_more(self, mock_db, mock_user):
-        from handlers.structures import Order, Product
+        from handlers.structures import Order, Product, OrderItem
         from datetime import datetime
         from decimal import Decimal
 
@@ -368,15 +385,12 @@ class TestAddOrderItem:
         )
 
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchone.side_effect = [order_data, (1, 1, 2, Decimal("25"))]
-        mock_cursor.fetchone.return_value = Order(
-            id=1,
-            status="unpublished",
-            total_amount=Decimal("150"),
-            created_at=datetime.now(),
-            warehouse_id=1,
-            created_by_id=1,
-        )
+        mock_cursor.execute.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [
+            OrderItem(
+                order_id=1, product_id=5, quantity=2, price=Decimal("25")
+            ),  # INSERT RETURNING *
+        ]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import order_items  # noqa: F811
@@ -386,20 +400,30 @@ class TestAddOrderItem:
             mock_tx.__exit__ = MagicMock(return_value=False)
             mock_db.transaction = MagicMock(return_value=mock_tx)
 
-            with patch("handlers.order_items.get_products") as mock_products:
-                mock_products.return_value = [
-                    Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1)
-                ]
-                with patch("handlers.order_items.get_order_items") as mock_items:
-                    mock_items.return_value = []
-                    with patch("handlers.order_items.prompt", side_effect=["Товар (S5)", "2", "y"]):
-                        with patch("handlers.order_items.YesNoValidator") as mock_ynn:
-                            # First call: user wants more → True, then we'd loop again
-                            # We'll just verify is_yes was called
-                            mock_ynn.is_yes = MagicMock(side_effect=[True, False])
-                            with patch("handlers.order_items.console"):
-                                order_items.add_order_item(1)
-                                mock_ynn.is_yes.assert_called()
+            # Patch get_order_by_id directly — check_order() calls it
+            with patch("handlers.order_items.get_order_by_id", return_value=order_data):
+                with patch("handlers.order_items.get_products") as mock_products:
+                    # First call: one product available; recursive call (after "да"): no products → exits
+                    mock_products.side_effect = [
+                        [Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1)],
+                        [],
+                    ]
+                    with patch("handlers.order_items.get_product_by_sku") as mock_sku:
+                        mock_sku.return_value = Product(
+                            id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1
+                        )
+                        with patch("handlers.order_items.get_order_items") as mock_items:
+                            mock_items.return_value = []
+                            with patch(
+                                "handlers.order_items.prompt",
+                                side_effect=["Товар (S5)", "2", "да"],
+                            ):
+                                with patch("handlers.order_items.YesNoValidator") as mock_ynn:
+                                    # First call: user wants more → True
+                                    mock_ynn.is_yes = MagicMock(side_effect=[True])
+                                    with patch("handlers.order_items.console"):
+                                        order_items.add_order_item(1)
+                                        mock_ynn.is_yes.assert_called()
 
 
 # ─── edit_order_item ──────────────────────────────────────────────────
@@ -460,16 +484,9 @@ class TestEditOrderItem:
         )
 
         mock_cursor = mock_db.cursor.return_value
-        mock_cursor.fetchone.side_effect = [order_data, OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))]
-        # Second fetch for get_order_by_id after update
-        mock_cursor.fetchone.return_value = Order(
-            id=1,
-            status="unpublished",
-            total_amount=Decimal("150"),
-            created_at=datetime.now(),
-            warehouse_id=1,
-            created_by_id=1,
-        )
+        mock_cursor.fetchone.side_effect = [
+            OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100")),
+        ]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import order_items  # noqa: F811
@@ -479,31 +496,33 @@ class TestEditOrderItem:
             mock_tx.__exit__ = MagicMock(return_value=False)
             mock_db.transaction = MagicMock(return_value=mock_tx)
 
-            with patch("handlers.order_items.get_order_items") as mock_items:
-                mock_items.return_value = [
-                    OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
-                ]
-                with patch("handlers.order_items.get_product_by_id") as mock_prod:
-                    mock_prod.return_value = Product(id=5, sku="S5", name="Товар", price=Decimal("75"), category_id=1)
-                    with patch("handlers.order_items.choice", return_value=5):
-                        with patch("handlers.order_items.prompt", return_value="1"):
-                            with patch("handlers.order_items.console"):
-                                order_items.edit_order_item(1)
+            # Patch get_order_by_id — check_order() and line 196 both call it
+            with patch("handlers.order_items.get_order_by_id", return_value=order_data):
+                with patch("handlers.order_items.get_order_items") as mock_items:
+                    mock_items.return_value = [
+                        OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
+                    ]
+                    with patch("handlers.order_items.get_product_by_id") as mock_prod:
+                        mock_prod.return_value = Product(id=5, sku="S5", name="Товар", price=Decimal("75"), category_id=1)
+                        with patch("handlers.order_items.choice", return_value=5):
+                            with patch("handlers.order_items.prompt", return_value="1"):
+                                with patch("handlers.order_items.console"):
+                                    order_items.edit_order_item(1)
 
-                                # UPDATE order_items executed
-                                update_item_calls = [
-                                    c
-                                    for c in mock_db.execute.call_args_list
-                                    if "UPDATE sales.order_items" in c[0][0]
-                                ]
-                                assert len(update_item_calls) >= 1
+                                    # UPDATE order_items executed
+                                    update_item_calls = [
+                                        c
+                                        for c in mock_db.execute.call_args_list
+                                        if "UPDATE sales.order_items" in c[0][0]
+                                    ]
+                                    assert len(update_item_calls) >= 1
 
-                                # UPDATE total_amount executed
-                                update_total_calls = [
-                                    c
-                                    for c in mock_db.execute.call_args_list
-                                    if "UPDATE sales.orders SET total_amount" in c[0][0]
-                                ]
+                                    # UPDATE total_amount executed
+                                    update_total_calls = [
+                                        c
+                                        for c in mock_db.execute.call_args_list
+                                        if "UPDATE sales.orders SET total_amount" in c[0][0]
+                                    ]
                                 assert len(update_total_calls) >= 1
 
 
