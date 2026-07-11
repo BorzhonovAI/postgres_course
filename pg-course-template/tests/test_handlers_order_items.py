@@ -280,11 +280,19 @@ class TestAddOrderItem:
 
             with patch("handlers.order_items.get_products") as mock_products:
                 mock_products.return_value = [
-                    Product(id=1, sku="S1", name="Продукт", price=Decimal("10"), category_id=1)
+                    Product(
+                        id=1,
+                        sku="S1",
+                        name="Продукт",
+                        price=Decimal("10"),
+                        category_id=1,
+                    )
                 ]
                 with patch("handlers.order_items.get_order_items") as mock_items:
                     mock_items.return_value = [
-                        OrderItem(order_id=1, product_id=1, quantity=1, price=Decimal("10"))
+                        OrderItem(
+                            order_id=1, product_id=1, quantity=1, price=Decimal("10")
+                        )
                     ]
                     with patch("handlers.order_items.render_error") as mock_error:
                         order_items.add_order_item(1)
@@ -344,7 +352,9 @@ class TestAddOrderItem:
             # consume the side_effect list meant for the INSERT RETURNING.
             with patch("handlers.order_items.get_order_by_id", return_value=order_data):
                 mock_products.return_value = [
-                    Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1),
+                    Product(
+                        id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1
+                    ),
                 ]
                 mock_product_by_sku.return_value = Product(
                     id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1
@@ -356,9 +366,7 @@ class TestAddOrderItem:
 
             # INSERT executed on cursor
             insert_calls = [
-                c
-                for c in mock_cursor.execute.call_args_list
-                if "INSERT" in c[0][0]
+                c for c in mock_cursor.execute.call_args_list if "INSERT" in c[0][0]
             ]
             assert len(insert_calls) >= 1
 
@@ -405,20 +413,36 @@ class TestAddOrderItem:
                 with patch("handlers.order_items.get_products") as mock_products:
                     # First call: one product available; recursive call (after "да"): no products → exits
                     mock_products.side_effect = [
-                        [Product(id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1)],
+                        [
+                            Product(
+                                id=5,
+                                sku="S5",
+                                name="Товар",
+                                price=Decimal("25"),
+                                category_id=1,
+                            )
+                        ],
                         [],
                     ]
                     with patch("handlers.order_items.get_product_by_sku") as mock_sku:
                         mock_sku.return_value = Product(
-                            id=5, sku="S5", name="Товар", price=Decimal("25"), category_id=1
+                            id=5,
+                            sku="S5",
+                            name="Товар",
+                            price=Decimal("25"),
+                            category_id=1,
                         )
-                        with patch("handlers.order_items.get_order_items") as mock_items:
+                        with patch(
+                            "handlers.order_items.get_order_items"
+                        ) as mock_items:
                             mock_items.return_value = []
                             with patch(
                                 "handlers.order_items.prompt",
                                 side_effect=["Товар (S5)", "2", "да"],
                             ):
-                                with patch("handlers.order_items.YesNoValidator") as mock_ynn:
+                                with patch(
+                                    "handlers.order_items.YesNoValidator"
+                                ) as mock_ynn:
                                     # First call: user wants more → True
                                     mock_ynn.is_yes = MagicMock(side_effect=[True])
                                     with patch("handlers.order_items.console"):
@@ -500,10 +524,18 @@ class TestEditOrderItem:
             with patch("handlers.order_items.get_order_by_id", return_value=order_data):
                 with patch("handlers.order_items.get_order_items") as mock_items:
                     mock_items.return_value = [
-                        OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
+                        OrderItem(
+                            order_id=1, product_id=5, quantity=2, price=Decimal("100")
+                        )
                     ]
                     with patch("handlers.order_items.get_product_by_id") as mock_prod:
-                        mock_prod.return_value = Product(id=5, sku="S5", name="Товар", price=Decimal("75"), category_id=1)
+                        mock_prod.return_value = Product(
+                            id=5,
+                            sku="S5",
+                            name="Товар",
+                            price=Decimal("75"),
+                            category_id=1,
+                        )
                         with patch("handlers.order_items.choice", return_value=5):
                             with patch("handlers.order_items.prompt", return_value="1"):
                                 with patch("handlers.order_items.console"):
@@ -521,7 +553,8 @@ class TestEditOrderItem:
                                     update_total_calls = [
                                         c
                                         for c in mock_db.execute.call_args_list
-                                        if "UPDATE sales.orders SET total_amount" in c[0][0]
+                                        if "UPDATE sales.orders SET total_amount"
+                                        in c[0][0]
                                     ]
                                 assert len(update_total_calls) >= 1
 
@@ -593,7 +626,9 @@ class TestDeleteOrderItem:
             from handlers import order_items  # noqa: F811
 
             with patch("handlers.order_items.get_product_by_id") as mock_prod:
-                mock_prod.return_value = Product(id=5, sku="S5", name="Товар", price=Decimal("100"), category_id=1)
+                mock_prod.return_value = Product(
+                    id=5, sku="S5", name="Товар", price=Decimal("100"), category_id=1
+                )
                 with patch("handlers.order_items.choice", return_value=5):
                     with patch("handlers.order_items._render_order_item"):
                         with patch("handlers.order_items.prompt", return_value="n"):
@@ -625,7 +660,9 @@ class TestDeleteOrderItem:
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchone.side_effect = [
             order_data,  # check_order → get_order_by_id
-            OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100")),  # get item
+            OrderItem(
+                order_id=1, product_id=5, quantity=2, price=Decimal("100")
+            ),  # get item
             Order(  # get_order_by_id after delete
                 id=1,
                 status="unpublished",
@@ -646,10 +683,18 @@ class TestDeleteOrderItem:
 
             with patch("handlers.order_items.get_order_items") as mock_items:
                 mock_items.return_value = [
-                    OrderItem(order_id=1, product_id=5, quantity=2, price=Decimal("100"))
+                    OrderItem(
+                        order_id=1, product_id=5, quantity=2, price=Decimal("100")
+                    )
                 ]
                 with patch("handlers.order_items.get_product_by_id") as mock_prod:
-                    mock_prod.return_value = Product(id=5, sku="S5", name="Товар", price=Decimal("100"), category_id=1)
+                    mock_prod.return_value = Product(
+                        id=5,
+                        sku="S5",
+                        name="Товар",
+                        price=Decimal("100"),
+                        category_id=1,
+                    )
                     with patch("handlers.order_items.choice", return_value=5):
                         with patch("handlers.order_items._render_order_item"):
                             with patch("handlers.order_items.prompt", return_value="y"):
@@ -668,6 +713,7 @@ class TestDeleteOrderItem:
                                     update_total_calls = [
                                         c
                                         for c in mock_db.execute.call_args_list
-                                        if "UPDATE sales.orders SET total_amount" in c[0][0]
+                                        if "UPDATE sales.orders SET total_amount"
+                                        in c[0][0]
                                     ]
                                     assert len(update_total_calls) >= 1
