@@ -190,7 +190,13 @@ def list_transfers_planned_my() -> None:
     [ROLE_INVENTORY_MANAGER],
 )
 def add_transfer_items() -> None:
-    """Интерактивное добавление товаров в planned transfer."""
+    """Интерактивное добавление товаров в planned transfer.
+
+    Интерактивная часть (prompt) выполняется вне транзакции, чтобы
+    блокировки FOR UPDATE не удерживались во время ожидания ввода.
+    SQL-операции (поиск/создание трансфера, проверка стока, INSERT)
+    остаются внутри транзакции.
+    """
     conn = get_conn()
 
     warehouses = get_warehouses()
@@ -217,6 +223,7 @@ def add_transfer_items() -> None:
 
     transfer_id = None
 
+    # Поиск/создание трансфера — в одной транзакции (атомарно)
     with conn.transaction():
         cur = conn.cursor()
         cur.execute(
@@ -252,65 +259,69 @@ def add_transfer_items() -> None:
                     return
                 transfer_id = row[0]
 
-        while True:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """SELECT s.product_id, p.name, p.sku, s.quantity
-                       FROM inventory.stock s
-                       JOIN catalog.products p ON s.product_id = p.id
-                       WHERE s.warehouse_id = %s
-                       ORDER BY p.name""",
-                    (from_wh_id,),
-                )
-                stock_rows = cur.fetchall()
-
-            if not stock_rows:
-                console.print("[yellow]На складе нет товаров[/yellow]")
-                break
-
-            product_options = [
-                (row[0], f"{row[1]} ({row[2]}) — сток: {row[3]}") for row in stock_rows
-            ]
-            product_id = prompt_choice(
-                message="Выберите товар (или 'Отмена'):",
-                options=product_options,
+    while True:  # ← цикл ВНУТРИ, промпты ВНЕ транзакции
+        # 1. Список стока склада отправления — вне транзакции
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT s.product_id, p.name, p.sku, s.quantity
+                   FROM inventory.stock s
+                   JOIN catalog.products p ON s.product_id = p.id
+                   WHERE s.warehouse_id = %s
+                   ORDER BY p.name""",
+                (from_wh_id,),
             )
+            stock_rows = cur.fetchall()
 
-            if product_id is None or product_id == "Отмена":
-                break
+        if not stock_rows:
+            console.print("[yellow]На складе нет товаров[/yellow]")
+            break
 
-            quantity = prompt(
-                "Количество: ",
-                validator=QuantityValidator(),
-            )
-            quantity = int(quantity)
+        product_options = [
+            (row[0], f"{row[1]} ({row[2]}) — сток: {row[3]}") for row in stock_rows
+        ]
 
-            answer = prompt(
-                f"Добавить {quantity} шт. в трансфер #{transfer_id}? (y/n, д/н): ",
-                validator=YesNoValidator(),
-            )
-            if not YesNoValidator.is_yes(answer):
-                continue
+        # 2. Все промпты — ВНЕ транзакции
+        product_id = prompt_choice(
+            message="Выберите товар (или 'Отмена'):",
+            options=product_options,
+        )
+        if product_id is None or product_id == "Отмена":
+            break
 
-            # Проверка наличия товара на складе
+        quantity_str = prompt(
+            "Количество: ",
+            validator=QuantityValidator(),
+        )
+        quantity = int(quantity_str)
+
+        answer = prompt(
+            f"Добавить {quantity} шт. в трансфер #{transfer_id}? (y/n, д/н): ",
+            validator=YesNoValidator(),
+        )
+        if not YesNoValidator.is_yes(answer):
+            continue
+
+        # 3. Проверка стока + INSERT — короткая транзакция
+        with conn.transaction():
+            # Блокируем строку stock — FOR UPDATE
             with conn.cursor(row_factory=dict_row) as check_cur:
                 check_cur.execute(
                     """SELECT s.quantity
                        FROM inventory.stock s
-                       WHERE s.warehouse_id = %s AND s.product_id = %s""",
+                       WHERE s.warehouse_id = %s AND s.product_id = %s
+                       FOR UPDATE""",
                     (from_wh_id, product_id),
                 )
                 stock_row = check_cur.fetchone()
-                if stock_row is None or stock_row[0] < quantity:
+                if stock_row is None or stock_row["quantity"] < quantity:
                     render_error(
                         f"На складе недостаточно товара: "
-                        f"доступно {stock_row[0] if stock_row else 0} шт., "
+                        f"доступно {stock_row['quantity'] if stock_row else 0} шт., "
                         f"нужно {quantity} шт."
                     )
                     continue
 
-            # Блокируем строку transfer_items (transfer_id, product_id, requested_by)
-            # чтобы исключить гонку при одновременном добавлении одного товара
+            # Блокируем строку transfer_items — FOR UPDATE
             with conn.cursor() as lock_cur:
                 lock_cur.execute(
                     """SELECT 1 FROM inventory.transfer_items
@@ -321,6 +332,7 @@ def add_transfer_items() -> None:
                 )
                 lock_cur.fetchone()  # consume — блокировка активна пока cursor жив
 
+            # INSERT transfer_items + UPDATE stock
             try:
                 conn.execute(
                     """INSERT INTO inventory.transfer_items
@@ -351,12 +363,13 @@ def add_transfer_items() -> None:
                 )
                 console.print(f"[green]Обновлено: добавлено ещё {quantity} шт.[/green]")
 
-            answer = prompt(
-                "Добавить ещё? (y/n, д/н): ",
-                validator=YesNoValidator(),
-            )
-            if not YesNoValidator.is_yes(answer):
-                break
+        # "Добавить ещё?" — ВНЕ транзакции
+        answer = prompt(
+            "Добавить ещё? (y/n, д/н): ",
+            validator=YesNoValidator(),
+        )
+        if not YesNoValidator.is_yes(answer):
+            break
 
     console.print(f"[green]Трансфер #{transfer_id} готов[/green]")
     _render_transfer_items(
@@ -381,7 +394,14 @@ def add_transfer_items() -> None:
     [ROLE_INVENTORY_MANAGER],
 )
 def remove_transfer_items() -> None:
-    """Интерактивное удаление товаров из planned transfer."""
+    """Интерактивное удаление товаров из planned transfer.
+
+    Интерактивная часть (prompt) выполняется вне транзакции, чтобы
+    блокировки FOR UPDATE не удерживались во время ожидания ввода.
+    SQL-операции (блокировка, UPDATE/DELETE) остаются внутри транзакции.
+    Использует while True вместо рекурсии — рекурсия внутри
+    conn.transaction() вызывает InFailedSqlTransaction в psycopg3.
+    """
     conn = get_conn()
 
     # Список planned transfer-ов с хотя бы одним item
@@ -412,40 +432,46 @@ def remove_transfer_items() -> None:
     if transfer_id is None:
         return
 
-    with conn.transaction():
-        # Блокируем transfer
-        cur = conn.cursor()
-        cur.execute(
-            """SELECT id FROM inventory.transfers
-               WHERE id = %s AND status = 'planned'
-               FOR UPDATE""",
-            (transfer_id,),
-        )
-        if cur.fetchone() is None:
-            render_error(f"Трансфер #{transfer_id} не найден или не в статусе planned")
-            return
-
-        # Список items в transfer
-        with conn.cursor(row_factory=class_row(TransferItem)) as cur:
+    while True:  # ← вместо рекурсии
+        # 1. Блокировка и чтение данных — ВНУТРИ транзакции
+        with conn.transaction():
+            # Блокируем transfer
+            cur = conn.cursor()
             cur.execute(
-                """SELECT * FROM inventory.transfer_items
-                   WHERE transfer_id = %s
-                   ORDER BY product_id""",
+                """SELECT id FROM inventory.transfers
+                   WHERE id = %s AND status = 'planned'
+                   FOR UPDATE""",
                 (transfer_id,),
             )
-            items: list[TransferItem] = cur.fetchall()
+            if cur.fetchone() is None:
+                render_error(
+                    f"Трансфер #{transfer_id} не найден или не в статусе planned"
+                )
+                return
 
-        if not items:
-            render_error(f"В трансфере #{transfer_id} нет товаров")
-            return
+            # Список items в transfer
+            with conn.cursor(row_factory=class_row(TransferItem)) as cur:
+                cur.execute(
+                    """SELECT * FROM inventory.transfer_items
+                       WHERE transfer_id = %s
+                       ORDER BY product_id""",
+                    (transfer_id,),
+                )
+                items: list[TransferItem] = cur.fetchall()
 
-        item_options = [(i.id, f"ID {i.product_id} — {i.quantity} шт.") for i in items]
+            if not items:
+                render_error(f"В трансфере #{transfer_id} нет товаров")
+                return
 
+            item_options = [
+                (i.id, f"ID {i.product_id} — {i.quantity} шт.") for i in items
+            ]
+
+        # 2. Все промпты — ВНЕ транзакции
         item_id = prompt_choice(
             message="Выберите товар для удаления (или 'Отмена'):",
             options=item_options,
         )
-
         if item_id is None or item_id == "Отмена":
             return
 
@@ -454,11 +480,11 @@ def remove_transfer_items() -> None:
             render_error(f"Товар #{item_id} не найден")
             return
 
-        remove_qty = prompt(
+        remove_qty_str = prompt(
             f"Количество для удаления (макс. {item.quantity}): ",
             validator=QuantityValidator(),
         )
-        remove_qty = int(remove_qty)
+        remove_qty = int(remove_qty_str)
 
         if remove_qty > item.quantity:
             render_error(f"Нельзя удалить больше {item.quantity} шт.")
@@ -471,42 +497,55 @@ def remove_transfer_items() -> None:
         if not YesNoValidator.is_yes(answer):
             return
 
-        cur.execute(
-            """UPDATE inventory.transfer_items
-               SET quantity = quantity - %s
-               WHERE transfer_id = %s AND product_id = %s AND quantity >= %s
-               RETURNING quantity""",
-            (remove_qty, transfer_id, item.product_id, remove_qty),
-        )
-        new_qty = cur.fetchone()
-        if new_qty is None:
-            render_error("Невозможно удалить такое количество")
-            return
+        # 3. Блокировка и модификация — ВНУТРИ транзакции
+        with conn.transaction():
+            # Блокируем строку transfer_items
+            with conn.cursor() as lock_cur:
+                lock_cur.execute(
+                    """SELECT id FROM inventory.transfer_items
+                       WHERE transfer_id = %s AND product_id = %s
+                       FOR UPDATE""",
+                    (transfer_id, item.product_id),
+                )
+                lock_cur.fetchone()  # consume — блокировка активна пока cursor жив
 
-        # Возвращаем quantity в stock
-        cur.execute(
-            """UPDATE inventory.stock SET quantity = quantity + %s
-               WHERE warehouse_id = (SELECT from_warehouse_id FROM inventory.transfers WHERE id = %s)
-                 AND product_id = %s""",
-            (remove_qty, transfer_id, item.product_id),
-        )
-
-        # Если quantity = 0, удаляем item
-        if new_qty[0] == 0:
-            conn.execute(
-                "DELETE FROM inventory.transfer_items WHERE id = %s",
-                (item_id,),
+            cur = conn.cursor()
+            cur.execute(
+                """UPDATE inventory.transfer_items
+                   SET quantity = quantity - %s
+                   WHERE transfer_id = %s AND product_id = %s AND quantity >= %s
+                   RETURNING quantity""",
+                (remove_qty, transfer_id, item.product_id, remove_qty),
             )
-            console.print(f"[green]Товар удалён из transfer #{transfer_id}[/green]")
-        else:
-            console.print(
-                f"[green]Удалено {remove_qty} шт., осталось {new_qty[0]} шт.[/green]"
+            new_qty = cur.fetchone()
+            if new_qty is None:
+                render_error("Невозможно удалить такое количество")
+                return
+
+            # Возвращаем quantity в stock
+            cur.execute(
+                """UPDATE inventory.stock SET quantity = quantity + %s
+                   WHERE warehouse_id = (SELECT from_warehouse_id FROM inventory.transfers WHERE id = %s)
+                     AND product_id = %s""",
+                (remove_qty, transfer_id, item.product_id),
             )
 
-        # Спросить удалить ещё
+            # Если quantity = 0, удаляем item
+            if new_qty[0] == 0:
+                conn.execute(
+                    "DELETE FROM inventory.transfer_items WHERE id = %s",
+                    (int(item_id),),
+                )
+                console.print(f"[green]Товар удалён из transfer #{transfer_id}[/green]")
+            else:
+                console.print(
+                    f"[green]Удалено {remove_qty} шт., осталось {new_qty[0]} шт.[/green]"
+                )
+
+        # "Удалить ещё?" — ВНЕ транзакции
         answer = prompt("Удалить ещё? (y/n, д/н): ", validator=YesNoValidator())
-        if YesNoValidator.is_yes(answer):
-            remove_transfer_items()
+        if not YesNoValidator.is_yes(answer):
+            break
 
 
 @command(
