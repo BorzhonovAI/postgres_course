@@ -195,7 +195,7 @@ def add_transfer_items() -> None:
 
     warehouses = get_warehouses()
     warehouses_options = [
-        (w.id, f"г. {get_warehouse_full_address(w.city_id)}, {w.address}")
+        (w.id, f"{get_warehouse_full_address(w.city_id)}, {w.address}")
         for w in warehouses
     ]
 
@@ -206,7 +206,7 @@ def add_transfer_items() -> None:
 
     to_warehouses = [w for w in warehouses if w.id != from_wh_id]
     to_warehouses_options = [
-        (w.id, f"г. {get_warehouse_full_address(w.city_id)}, {w.address}")
+        (w.id, f"{get_warehouse_full_address(w.city_id)}, {w.address}")
         for w in to_warehouses
     ]
 
@@ -238,7 +238,7 @@ def add_transfer_items() -> None:
                        VALUES (%s, %s, 'planned') RETURNING id""",
                     (from_wh_id, to_wh_id),
                 ).fetchone()[0]
-                console.print(f"[green]Создан transfer #{transfer_id}[/green]")
+                console.print(f"[green]Создан трансфер #{transfer_id}[/green]")
             except UniqueViolation:
                 cur.execute(
                     """SELECT id FROM inventory.transfers
