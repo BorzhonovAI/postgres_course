@@ -151,14 +151,15 @@ class TestAddTransferItemsRaceCondition:
             return 1
 
         # 1. Первая транзакция: FOR UPDATE on transfers → (1,)
-        # 2. Вторая транзакция: статус трансфера → ('planned',)
-        # 3. Вторая транзакция: FOR UPDATE on stock → {"quantity": 100}
-        # 4. Вторая транзакция: FOR UPDATE transfer_items → 1
+        # 2. Вторая транзакция (SERIALIZABLE):
+        #    - статус трансфера → {"status": "planned"}
+        #    - FOR UPDATE transfer_items → 1 (item exists → UPDATE path)
+        #    - FOR UPDATE stock → {"quantity": 100}
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
             {"status": "planned"},  # transfer status check (2nd tx, dict_row)
-            {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
-            1,  # transfer_items lock consume (2nd tx)
+            1,  # FOR UPDATE transfer_items (2nd tx, item exists)
+            {"quantity": 100},  # stock FOR UPDATE (2nd tx, dict_row)
         ]
 
         with patch("db.get_conn", return_value=mock_db):
@@ -205,20 +206,17 @@ class TestAddTransferItemsRaceCondition:
 
                                         traceback.print_exc()
 
-                                    # Verify FOR UPDATE on transfer_items was called
-                                    execute_calls = mock_cursor.execute.call_args_list
-                                    found = False
+                                    # Verify UPDATE (not INSERT) — item_row=1 means item exists
+                                    execute_calls = mock_db.execute.call_args_list
+                                    found_update = False
                                     for call in execute_calls:
                                         sql = call[0][0]
-                                        if (
-                                            "transfer_items" in sql
-                                            and "FOR UPDATE" in sql.upper()
-                                        ):
-                                            found = True
+                                        if "UPDATE inventory.transfer_items" in sql:
+                                            found_update = True
                                             break
-                                    assert found, (
-                                        "add_transfer_items must lock transfer_items "
-                                        "with SELECT ... FOR UPDATE before INSERT"
+                                    assert found_update, (
+                                        "add_transfer_items must UPDATE transfer_items "
+                                        "when item already exists (check-then-act)"
                                     )
 
 
@@ -245,23 +243,16 @@ class TestAddTransferItemsInsufficientStock:
             id=2, city_id=1, address="addr2", label=None, is_central=False
         )
 
-        # flow: FOR UPDATE transfers (1st tx), then cancel outside tx
-        # Note: 2nd tx (stock FOR UPDATE on line 309) also calls fetchone,
-        # but user cancels with "n" BEFORE reaching the 2nd transaction.
-        # Actually: cancel happens at prompt_choice for "Добавить ещё?" which
-        # is AFTER the 2nd transaction closes. So we need 2 fetchone values:
-        # 1st tx FOR UPDATE transfers, 2nd tx FOR UPDATE stock.
-        # But user cancels at prompt_choice for "Выберите товар" → None → break,
-        # BEFORE the 2nd transaction. Let's verify the exact flow:
-        # 1st tx (FOR UPDATE) → closes → loop: stock list (fetchall) →
-        # prompt_choice=10 (product) → prompt="5" → prompt="y" → 2nd tx (FOR UPDATE stock).
-        # So user confirms "y", entering 2nd tx. fetchone needed for stock FOR UPDATE.
-        # 1st tx: FOR UPDATE transfers → (1,)
-        # 2nd tx: status check → ('planned',), stock FOR UPDATE → {"quantity": 2}
+        # flow: 1st tx (FOR UPDATE transfers) → closes → loop:
+        # prompt_choice=10 (product) → prompt="5" → prompt="y" → 2nd tx:
+        #   1) FOR UPDATE transfers status (dict_row)
+        #   2) FOR UPDATE transfer_items (item_cur.fetchone → None, not exists)
+        #   3) FOR UPDATE stock (dict_row → insufficient)
         mock_cursor.fetchone.side_effect = [
-            (1,),
-            {"status": "planned"},
-            {"quantity": 2},
+            (1,),  # 1st tx: FOR UPDATE transfers
+            {"status": "planned"},  # 2nd tx: FOR UPDATE transfers status (dict_row)
+            None,  # 2nd tx: FOR UPDATE transfer_items (item not found → INSERT path)
+            {"quantity": 2},  # 2nd tx: FOR UPDATE stock (dict_row, insufficient)
         ]
 
         # stock check uses dict_row → fetchone returns dict
@@ -294,14 +285,14 @@ class TestAddTransferItemsInsufficientStock:
                         "handlers.transfers.get_warehouse_full_address",
                         return_value="City, addr",
                     ):
-                        # from_wh, to_wh, product, cancel
+                        # from_wh, to_wh, product, "Отмена" из списка
                         with patch(
                             "handlers.transfers.prompt_choice",
-                            side_effect=[1, 2, 10, None],
+                            side_effect=[1, 2, 10, "Отмена"],
                         ):
-                            # quantity, answer (add_more not reached)
+                            # quantity, confirm, "Добавить ещё?" = "n"
                             with patch(
-                                "handlers.transfers.prompt", side_effect=["5", "y"]
+                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
                             ):
                                 with patch(
                                     "handlers.transfers.render_error"
@@ -313,9 +304,7 @@ class TestAddTransferItemsInsufficientStock:
                                         # Use lambda so that mock_db.transaction()
                                         # always returns mock_tx (not a new MagicMock),
                                         # even when called multiple times (nested tx).
-                                        mock_db.transaction.side_effect = (
-                                            lambda: mock_tx
-                                        )
+                                        mock_db.transaction.return_value = mock_tx
                                         mock_db.cursor = MagicMock(
                                             return_value=mock_cursor
                                         )
@@ -340,9 +329,10 @@ class TestAddTransferItemsInsufficientStock:
         loop continues (user can try another product)."""
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchone.side_effect = [
-            (1,),  # FOR UPDATE: row found
-            {"status": "planned"},  # transfer status check (dict_row)
-            {"quantity": 1},  # stock check via dict_row
+            (1,),  # FOR UPDATE transfers (1st tx)
+            {"status": "planned"},  # FOR UPDATE transfers status (2nd tx, dict_row)
+            None,  # FOR UPDATE transfer_items (2nd tx, not found)
+            {"quantity": 1},  # FOR UPDATE stock (2nd tx, dict_row, insufficient)
         ]
         mock_db.execute.return_value = MagicMock()
         mock_tx = MagicMock()
@@ -381,14 +371,14 @@ class TestAddTransferItemsInsufficientStock:
                         "handlers.transfers.get_warehouse_full_address",
                         return_value="City, addr",
                     ):
-                        # from_wh, to_wh, product1, cancel
+                        # from_wh, to_wh, product1, "Отмена" из списка
                         with patch(
                             "handlers.transfers.prompt_choice",
-                            side_effect=[1, 2, 10, None],
+                            side_effect=[1, 2, 10, "Отмена"],
                         ):
-                            # quantity, answer
+                            # quantity, confirm, "Добавить ещё?" = "n"
                             with patch(
-                                "handlers.transfers.prompt", side_effect=["5", "y"]
+                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
                             ):
                                 with patch(
                                     "handlers.transfers.render_error"
@@ -429,20 +419,15 @@ class TestAddTransferItemsStockLock:
             id=2, city_id=1, address="addr2", label=None, is_central=False
         )
 
-        # 1st tx: FOR UPDATE on transfers → (1,)
-        # 2nd tx: status check → ('planned',), FOR UPDATE on stock → {"quantity": 100}
-        #         lock transfer_items → 1
+        # SERIALIZABLE tx: status → planned, FOR UPDATE transfer_items → 1, stock → 100
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
             {"status": "planned"},  # transfer status check (2nd tx, dict_row)
-            {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
-            1,  # transfer_items lock consume (2nd tx)
+            1,  # FOR UPDATE transfer_items (2nd tx, item exists)
+            {"quantity": 100},  # stock FOR UPDATE (2nd tx, dict_row)
         ]
 
-        mock_tx = MagicMock()
-        mock_tx.cursor.return_value = mock_cursor
-
-        with patch("handlers.transfers.get_conn", return_value=mock_tx):
+        with patch("db.get_conn", return_value=mock_db):
             from handlers import transfers
 
             with patch(
@@ -459,7 +444,7 @@ class TestAddTransferItemsStockLock:
                     ):
                         with patch(
                             "handlers.transfers.prompt_choice",
-                            side_effect=[1, 2, 10, "y", "n"],
+                            side_effect=[1, 2, 10],
                         ):
                             with patch(
                                 "handlers.transfers.prompt", side_effect=["5", "y", "n"]
@@ -486,8 +471,8 @@ class TestAddTransferItemsStockLock:
                                         )
 
     def test_stock_locked_before_transfer_items_lock(self, mock_db, mock_user):
-        """Stock FOR UPDATE must appear before transfer_items FOR UPDATE
-        in the call sequence."""
+        """transfer_items UPDATE must appear before stock UPDATE
+        in the SERIALIZABLE transaction (check-then-act pattern)."""
         mock_cursor = mock_db.cursor.return_value
         mock_db.execute.return_value = MagicMock()
         mock_cursor.fetchall.return_value = [(10, "TestProduct", "SKU001", 100)]
@@ -506,20 +491,15 @@ class TestAddTransferItemsStockLock:
             id=2, city_id=1, address="addr2", label=None, is_central=False
         )
 
-        # 1st tx: FOR UPDATE on transfers → (1,)
-        # 2nd tx: status check → ('planned',), FOR UPDATE on stock → {"quantity": 100}
-        #         lock transfer_items → 1
+        # SERIALIZABLE tx: status → planned, FOR UPDATE transfer_items → 1, stock → 100
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
             {"status": "planned"},  # transfer status check (2nd tx, dict_row)
-            {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
-            1,  # transfer_items lock consume (2nd tx)
+            1,  # FOR UPDATE transfer_items (2nd tx, item exists)
+            {"quantity": 100},  # stock FOR UPDATE (2nd tx, dict_row)
         ]
 
-        mock_tx = MagicMock()
-        mock_tx.cursor.return_value = mock_cursor
-
-        with patch("handlers.transfers.get_conn", return_value=mock_tx):
+        with patch("db.get_conn", return_value=mock_db):
             from handlers import transfers
 
             with patch(
@@ -536,10 +516,11 @@ class TestAddTransferItemsStockLock:
                     ):
                         with patch(
                             "handlers.transfers.prompt_choice",
-                            side_effect=[1, 2, 10, "y", "n"],
+                            side_effect=[1, 2, 10],
                         ):
                             with patch(
-                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                                "handlers.transfers.prompt",
+                                side_effect=["5", "y", "n"],
                             ):
                                 with patch("handlers.transfers.console"):
                                     with patch(
@@ -549,24 +530,23 @@ class TestAddTransferItemsStockLock:
                                         transfers.add_transfer_items()
 
                                         execute_calls = (
-                                            mock_cursor.execute.call_args_list
+                                            mock_db.execute.call_args_list
                                         )
                                         sqls = [c[0][0] for c in execute_calls]
-                                        stock_idx = next(
+                                        update_idx = next(
                                             i
                                             for i, sql in enumerate(sqls)
-                                            if "inventory.stock" in sql
-                                            and "FOR UPDATE" in sql.upper()
+                                            if "UPDATE inventory.transfer_items" in sql
                                         )
-                                        ti_idx = next(
+                                        stock_update_idx = next(
                                             i
                                             for i, sql in enumerate(sqls)
-                                            if "transfer_items" in sql
-                                            and "FOR UPDATE" in sql.upper()
+                                            if "UPDATE inventory.stock" in sql
+                                            and "quantity" in sql
                                         )
-                                        assert stock_idx < ti_idx, (
-                                            "Stock FOR UPDATE must come before "
-                                            "transfer_items FOR UPDATE"
+                                        assert update_idx < stock_update_idx, (
+                                            "transfer_items UPDATE must come before "
+                                            "stock UPDATE (SERIALIZABLE tx)"
                                         )
 
 

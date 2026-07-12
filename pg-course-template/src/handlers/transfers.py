@@ -3,7 +3,8 @@ from typing import Any
 
 from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import choice as prompt_choice
-from psycopg.errors import UniqueViolation
+from psycopg.errors import SerializationFailure, UniqueViolation
+from psycopg import IsolationLevel
 from psycopg.rows import class_row, dict_row
 from rich.table import Table
 
@@ -326,10 +327,11 @@ def add_transfer_items() -> None:
         product_options = [
             (row[0], f"{row[1]} ({row[2]}) — сток: {row[3]}") for row in stock_rows
         ]
+        product_options.append(("Отмена", "Отмена"))
 
         # 2. Все промпты — ВНЕ транзакции
         product_id = prompt_choice(
-            message="Выберите товар (или 'Отмена'):",
+            message="Выберите товар:",
             options=product_options,
         )
         if product_id is None or product_id == "Отмена":
@@ -348,82 +350,88 @@ def add_transfer_items() -> None:
         if not YesNoValidator.is_yes(answer):
             continue
 
-        # 3. Проверка стока + INSERT — короткая транзакция
-        with conn.transaction():
-            # Блокируем трансфер и проверяем, что он всё ещё planned
-            with conn.cursor(row_factory=dict_row) as transfer_lock_cur:
-                transfer_lock_cur.execute(
-                    """SELECT status FROM inventory.transfers
-                       WHERE id = %s FOR UPDATE""",
-                    (transfer_id,),
-                )
-                transfer_row = transfer_lock_cur.fetchone()
-                if transfer_row is None or transfer_row["status"] != "planned":
-                    render_error(
-                        f"Трансфер #{transfer_id} уже не в статусе planned — "
-                        f"добавление невозможно."
+        # 3. Проверка стока + INSERT/UPDATE — SERIALIZABLE
+        try:
+            with conn.transaction(isolation=IsolationLevel.SERIALIZABLE):
+                # Блокируем трансфер и проверяем, что он всё ещё planned
+                with conn.cursor(row_factory=dict_row) as transfer_lock_cur:
+                    transfer_lock_cur.execute(
+                        """SELECT status FROM inventory.transfers
+                           WHERE id = %s FOR UPDATE""",
+                        (transfer_id,),
                     )
-                    continue
+                    transfer_row = transfer_lock_cur.fetchone()
+                    if transfer_row is None or transfer_row["status"] != "planned":
+                        render_error(
+                            f"Трансфер #{transfer_id} уже не в статусе planned — "
+                            f"добавление невозможно."
+                        )
+                        continue
 
-            # Блокируем строку stock — FOR UPDATE
-            with conn.cursor(row_factory=dict_row) as check_cur:
-                check_cur.execute(
-                    """SELECT s.quantity
-                       FROM inventory.stock s
-                       WHERE s.warehouse_id = %s AND s.product_id = %s
-                       FOR UPDATE""",
-                    (from_wh_id, product_id),
-                )
-                stock_row = check_cur.fetchone()
-                if stock_row is None or stock_row["quantity"] < quantity:
-                    render_error(
-                        f"На складе недостаточно товара: "
-                        f"доступно {stock_row['quantity'] if stock_row else 0} шт., "
-                        f"нужно {quantity} шт."
+                # Проверяем, существует ли уже пункт трансфера для этого пользователя
+                with conn.cursor() as item_cur:
+                    item_cur.execute(
+                        """SELECT id FROM inventory.transfer_items
+                           WHERE transfer_id = %s AND product_id = %s AND requested_by = %s
+                             AND reserve_id IS NULL
+                           FOR UPDATE""",
+                        (transfer_id, product_id, auth_user().id),
                     )
-                    continue
+                    item_row = item_cur.fetchone()
 
-            # Блокируем строку transfer_items — FOR UPDATE
-            with conn.cursor() as lock_cur:
-                lock_cur.execute(
-                    """SELECT 1 FROM inventory.transfer_items
-                       WHERE transfer_id = %s AND product_id = %s AND requested_by = %s
-                         AND reserve_id IS NULL
-                       FOR UPDATE""",
-                    (transfer_id, product_id, auth_user().id),
-                )
-                lock_cur.fetchone()  # consume — блокировка активна пока cursor жив
+                # Блокируем строку stock — FOR UPDATE
+                with conn.cursor(row_factory=dict_row) as check_cur:
+                    check_cur.execute(
+                        """SELECT s.quantity
+                           FROM inventory.stock s
+                           WHERE s.warehouse_id = %s AND s.product_id = %s
+                           FOR UPDATE""",
+                        (from_wh_id, product_id),
+                    )
+                    stock_row = check_cur.fetchone()
+                    if stock_row is None or stock_row["quantity"] < quantity:
+                        render_error(
+                            f"На складе недостаточно товара: "
+                            f"доступно {stock_row['quantity'] if stock_row else 0} шт., "
+                            f"нужно {quantity} шт."
+                        )
+                        continue
 
-            # INSERT transfer_items + UPDATE stock
-            try:
-                conn.execute(
-                    """INSERT INTO inventory.transfer_items
-                       (transfer_id, product_id, quantity, requested_by)
-                       VALUES (%s, %s, %s, %s)""",
-                    (transfer_id, product_id, quantity, auth_user().id),
-                )
+                # Check-then-act: на основе SELECT решаем INSERT или UPDATE
+                if item_row:
+                    # Пункт уже существует — добавляем к текущему количеству
+                    conn.execute(
+                        """UPDATE inventory.transfer_items
+                           SET quantity = quantity + %s
+                           WHERE transfer_id = %s AND product_id = %s
+                             AND requested_by = %s AND reserve_id IS NULL""",
+                        (quantity, transfer_id, product_id, auth_user().id),
+                    )
+                    console.print(
+                        f"[green]Обновлено: добавлено ещё {quantity} шт.[/green]"
+                    )
+                else:
+                    # Пункт не существует — создаём новый
+                    conn.execute(
+                        """INSERT INTO inventory.transfer_items
+                           (transfer_id, product_id, quantity, requested_by)
+                           VALUES (%s, %s, %s, %s)""",
+                        (transfer_id, product_id, quantity, auth_user().id),
+                    )
+                    console.print(f"[green]Добавлено {quantity} шт.[/green]")
 
+                # Обновляем сток склада (одинаковый для INSERT и UPDATE)
                 conn.execute(
                     """UPDATE inventory.stock SET quantity = quantity - %s
                        WHERE warehouse_id = %s AND product_id = %s""",
                     (quantity, from_wh_id, product_id),
                 )
-                console.print(f"[green]Добавлено {quantity} шт.[/green]")
 
-            except UniqueViolation:
-                conn.execute(
-                    """UPDATE inventory.transfer_items
-                       SET quantity = quantity + %s
-                       WHERE transfer_id = %s AND product_id = %s
-                         AND requested_by = %s AND reserve_id IS NULL""",
-                    (quantity, transfer_id, product_id, auth_user().id),
-                )
-                conn.execute(
-                    """UPDATE inventory.stock SET quantity = quantity - %s
-                       WHERE warehouse_id = %s AND product_id = %s""",
-                    (quantity, from_wh_id, product_id),
-                )
-                console.print(f"[green]Обновлено: добавлено ещё {quantity} шт.[/green]")
+        except SerializationFailure:
+            render_error(
+                "Попытка одновременного изменения. Попробуйте ещё раз."
+            )
+            continue
 
         # "Добавить ещё?" — ВНЕ транзакции
         answer = prompt(
