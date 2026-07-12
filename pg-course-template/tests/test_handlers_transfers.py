@@ -151,10 +151,12 @@ class TestAddTransferItemsRaceCondition:
             return 1
 
         # 1. Первая транзакция: FOR UPDATE on transfers → (1,)
-        # 2. Вторая транзакция: FOR UPDATE on stock → {"quantity": 100}
-        # 3. Вторая транзакция: FOR UPDATE transfer_items → 1
+        # 2. Вторая транзакция: статус трансфера → ('planned',)
+        # 3. Вторая транзакция: FOR UPDATE on stock → {"quantity": 100}
+        # 4. Вторая транзакция: FOR UPDATE transfer_items → 1
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
+            {"status": "planned"},  # transfer status check (2nd tx, dict_row)
             {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
             1,  # transfer_items lock consume (2nd tx)
         ]
@@ -163,30 +165,37 @@ class TestAddTransferItemsRaceCondition:
             from handlers import transfers
 
             with patch(
-                "handlers.transfers.get_warehouses", return_value=[fake_wh1, fake_wh2]
+                "handlers.transfers._get_route_pairs",
+                return_value={1: [2], 2: [1]},
             ):
                 with patch(
-                    "handlers.transfers.get_warehouse_full_address",
-                    return_value="City, addr",
+                    "handlers.transfers.get_warehouses",
+                    return_value=[fake_wh1, fake_wh2],
                 ):
-                    # prompt_choice: from_wh, to_wh, product, confirm, add_more — всё вне транзакции
                     with patch(
-                        "handlers.transfers.prompt_choice",
-                        side_effect=[1, 2, 10, "y", "n"],
+                        "handlers.transfers.get_warehouse_full_address",
+                        return_value="City, addr",
                     ):
+                        # prompt_choice: from_wh, to_wh, product, confirm, add_more — всё вне транзакции
                         with patch(
-                            "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            "handlers.transfers.prompt_choice",
+                            side_effect=[1, 2, 10, "y", "n"],
                         ):
-                            with patch("handlers.transfers.console"):
-                                with patch(
-                                    "handlers.transfers.auth_user",
-                                    return_value=mock_user,
-                                ):
-                                    # Patch ALL cursor() calls to return mock_cursor
-                                    mock_db.cursor = MagicMock(return_value=mock_cursor)
-                                    mock_tx = MagicMock()
-                                    mock_tx.cursor.return_value = mock_cursor
-                                    mock_db.transaction.return_value = mock_tx
+                            with patch(
+                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            ):
+                                with patch("handlers.transfers.console"):
+                                    with patch(
+                                        "handlers.transfers.auth_user",
+                                        return_value=mock_user,
+                                    ):
+                                        # Patch ALL cursor() calls to return mock_cursor
+                                        mock_db.cursor = MagicMock(
+                                            return_value=mock_cursor
+                                        )
+                                        mock_tx = MagicMock()
+                                        mock_tx.cursor.return_value = mock_cursor
+                                        mock_db.transaction.return_value = mock_tx
 
                                     try:
                                         transfers.add_transfer_items()
@@ -248,8 +257,12 @@ class TestAddTransferItemsInsufficientStock:
         # prompt_choice=10 (product) → prompt="5" → prompt="y" → 2nd tx (FOR UPDATE stock).
         # So user confirms "y", entering 2nd tx. fetchone needed for stock FOR UPDATE.
         # 1st tx: FOR UPDATE transfers → (1,)
-        # 2nd tx (inner): SELECT stock FOR UPDATE → {"quantity": 2}
-        mock_cursor.fetchone.side_effect = [(1,), {"quantity": 2}]
+        # 2nd tx: status check → ('planned',), stock FOR UPDATE → {"quantity": 2}
+        mock_cursor.fetchone.side_effect = [
+            (1,),
+            {"status": "planned"},
+            {"quantity": 2},
+        ]
 
         # stock check uses dict_row → fetchone returns dict
         stock_cursor = MagicMock()
@@ -270,33 +283,45 @@ class TestAddTransferItemsInsufficientStock:
             from handlers import transfers
 
             with patch(
-                "handlers.transfers.get_warehouses", return_value=[fake_wh1, fake_wh2]
+                "handlers.transfers._get_route_pairs",
+                return_value={1: [2], 2: [1]},
             ):
                 with patch(
-                    "handlers.transfers.get_warehouse_full_address",
-                    return_value="City, addr",
+                    "handlers.transfers.get_warehouses",
+                    return_value=[fake_wh1, fake_wh2],
                 ):
-                    # from_wh, to_wh, product, cancel
                     with patch(
-                        "handlers.transfers.prompt_choice", side_effect=[1, 2, 10, None]
+                        "handlers.transfers.get_warehouse_full_address",
+                        return_value="City, addr",
                     ):
-                        # quantity, answer (add_more not reached)
-                        with patch("handlers.transfers.prompt", side_effect=["5", "y"]):
+                        # from_wh, to_wh, product, cancel
+                        with patch(
+                            "handlers.transfers.prompt_choice",
+                            side_effect=[1, 2, 10, None],
+                        ):
+                            # quantity, answer (add_more not reached)
                             with patch(
-                                "handlers.transfers.render_error"
-                            ) as mock_render_error:
+                                "handlers.transfers.prompt", side_effect=["5", "y"]
+                            ):
                                 with patch(
-                                    "handlers.transfers.auth_user",
-                                    return_value=mock_user,
-                                ):
-                                    # Use lambda so that mock_db.transaction()
-                                    # always returns mock_tx (not a new MagicMock),
-                                    # even when called multiple times (nested tx).
-                                    mock_db.transaction.side_effect = lambda: mock_tx
-                                    mock_db.cursor = MagicMock(return_value=mock_cursor)
-                                    mock_cursor.__enter__.return_value = mock_cursor
+                                    "handlers.transfers.render_error"
+                                ) as mock_render_error:
+                                    with patch(
+                                        "handlers.transfers.auth_user",
+                                        return_value=mock_user,
+                                    ):
+                                        # Use lambda so that mock_db.transaction()
+                                        # always returns mock_tx (not a new MagicMock),
+                                        # even when called multiple times (nested tx).
+                                        mock_db.transaction.side_effect = (
+                                            lambda: mock_tx
+                                        )
+                                        mock_db.cursor = MagicMock(
+                                            return_value=mock_cursor
+                                        )
+                                        mock_cursor.__enter__.return_value = mock_cursor
 
-                                    transfers.add_transfer_items()
+                                        transfers.add_transfer_items()
 
                                     # render_error should have been called
                                     # with insufficient stock message
@@ -316,6 +341,7 @@ class TestAddTransferItemsInsufficientStock:
         mock_cursor = mock_db.cursor.return_value
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE: row found
+            {"status": "planned"},  # transfer status check (dict_row)
             {"quantity": 1},  # stock check via dict_row
         ]
         mock_db.execute.return_value = MagicMock()
@@ -344,32 +370,40 @@ class TestAddTransferItemsInsufficientStock:
             from handlers import transfers
 
             with patch(
-                "handlers.transfers.get_warehouses", return_value=[fake_wh1, fake_wh2]
+                "handlers.transfers._get_route_pairs",
+                return_value={1: [2], 2: [1]},
             ):
                 with patch(
-                    "handlers.transfers.get_warehouse_full_address",
-                    return_value="City, addr",
+                    "handlers.transfers.get_warehouses",
+                    return_value=[fake_wh1, fake_wh2],
                 ):
-                    # from_wh, to_wh, product1, cancel
                     with patch(
-                        "handlers.transfers.prompt_choice", side_effect=[1, 2, 10, None]
+                        "handlers.transfers.get_warehouse_full_address",
+                        return_value="City, addr",
                     ):
-                        # quantity, answer
-                        with patch("handlers.transfers.prompt", side_effect=["5", "y"]):
+                        # from_wh, to_wh, product1, cancel
+                        with patch(
+                            "handlers.transfers.prompt_choice",
+                            side_effect=[1, 2, 10, None],
+                        ):
+                            # quantity, answer
                             with patch(
-                                "handlers.transfers.render_error"
-                            ) as mock_render_error:
+                                "handlers.transfers.prompt", side_effect=["5", "y"]
+                            ):
                                 with patch(
-                                    "handlers.transfers.auth_user",
-                                    return_value=mock_user,
-                                ):
-                                    # Should not raise — loop continues after error
-                                    transfers.add_transfer_items()
-                                    # render_error should have been called
-                                    assert mock_render_error.called, (
-                                        "render_error should be called for "
-                                        "insufficient stock"
-                                    )
+                                    "handlers.transfers.render_error"
+                                ) as mock_render_error:
+                                    with patch(
+                                        "handlers.transfers.auth_user",
+                                        return_value=mock_user,
+                                    ):
+                                        # Should not raise — loop continues after error
+                                        transfers.add_transfer_items()
+                                        # render_error should have been called
+                                        assert mock_render_error.called, (
+                                            "render_error should be called for "
+                                            "insufficient stock"
+                                        )
 
 
 class TestAddTransferItemsStockLock:
@@ -396,9 +430,11 @@ class TestAddTransferItemsStockLock:
         )
 
         # 1st tx: FOR UPDATE on transfers → (1,)
-        # 2nd tx: FOR UPDATE on stock → {"quantity": 100}, lock transfer_items → 1
+        # 2nd tx: status check → ('planned',), FOR UPDATE on stock → {"quantity": 100}
+        #         lock transfer_items → 1
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
+            {"status": "planned"},  # transfer status check (2nd tx, dict_row)
             {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
             1,  # transfer_items lock consume (2nd tx)
         ]
@@ -410,37 +446,44 @@ class TestAddTransferItemsStockLock:
             from handlers import transfers
 
             with patch(
-                "handlers.transfers.get_warehouses", return_value=[fake_wh1, fake_wh2]
+                "handlers.transfers._get_route_pairs",
+                return_value={1: [2], 2: [1]},
             ):
                 with patch(
-                    "handlers.transfers.get_warehouse_full_address",
-                    return_value="City, addr",
+                    "handlers.transfers.get_warehouses",
+                    return_value=[fake_wh1, fake_wh2],
                 ):
                     with patch(
-                        "handlers.transfers.prompt_choice",
-                        side_effect=[1, 2, 10, "y", "n"],
+                        "handlers.transfers.get_warehouse_full_address",
+                        return_value="City, addr",
                     ):
                         with patch(
-                            "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            "handlers.transfers.prompt_choice",
+                            side_effect=[1, 2, 10, "y", "n"],
                         ):
-                            with patch("handlers.transfers.console"):
-                                with patch(
-                                    "handlers.transfers.auth_user",
-                                    return_value=mock_user,
-                                ):
-                                    transfers.add_transfer_items()
+                            with patch(
+                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            ):
+                                with patch("handlers.transfers.console"):
+                                    with patch(
+                                        "handlers.transfers.auth_user",
+                                        return_value=mock_user,
+                                    ):
+                                        transfers.add_transfer_items()
 
-                                    # Verify FOR UPDATE on stock was called
-                                    execute_calls = mock_cursor.execute.call_args_list
-                                    stock_lock_found = any(
-                                        "inventory.stock" in c[0][0]
-                                        and "FOR UPDATE" in c[0][0].upper()
-                                        for c in execute_calls
-                                    )
-                                    assert stock_lock_found, (
-                                        "add_transfer_items must lock stock "
-                                        "with SELECT ... FOR UPDATE"
-                                    )
+                                        # Verify FOR UPDATE on stock was called
+                                        execute_calls = (
+                                            mock_cursor.execute.call_args_list
+                                        )
+                                        stock_lock_found = any(
+                                            "inventory.stock" in c[0][0]
+                                            and "FOR UPDATE" in c[0][0].upper()
+                                            for c in execute_calls
+                                        )
+                                        assert stock_lock_found, (
+                                            "add_transfer_items must lock stock "
+                                            "with SELECT ... FOR UPDATE"
+                                        )
 
     def test_stock_locked_before_transfer_items_lock(self, mock_db, mock_user):
         """Stock FOR UPDATE must appear before transfer_items FOR UPDATE
@@ -464,9 +507,11 @@ class TestAddTransferItemsStockLock:
         )
 
         # 1st tx: FOR UPDATE on transfers → (1,)
-        # 2nd tx: FOR UPDATE on stock → {"quantity": 100}, lock transfer_items → 1
+        # 2nd tx: status check → ('planned',), FOR UPDATE on stock → {"quantity": 100}
+        #         lock transfer_items → 1
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st tx)
+            {"status": "planned"},  # transfer status check (2nd tx, dict_row)
             {"quantity": 100},  # stock FOR UPDATE (dict_row, 2nd tx)
             1,  # transfer_items lock consume (2nd tx)
         ]
@@ -478,44 +523,51 @@ class TestAddTransferItemsStockLock:
             from handlers import transfers
 
             with patch(
-                "handlers.transfers.get_warehouses", return_value=[fake_wh1, fake_wh2]
+                "handlers.transfers._get_route_pairs",
+                return_value={1: [2], 2: [1]},
             ):
                 with patch(
-                    "handlers.transfers.get_warehouse_full_address",
-                    return_value="City, addr",
+                    "handlers.transfers.get_warehouses",
+                    return_value=[fake_wh1, fake_wh2],
                 ):
                     with patch(
-                        "handlers.transfers.prompt_choice",
-                        side_effect=[1, 2, 10, "y", "n"],
+                        "handlers.transfers.get_warehouse_full_address",
+                        return_value="City, addr",
                     ):
                         with patch(
-                            "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            "handlers.transfers.prompt_choice",
+                            side_effect=[1, 2, 10, "y", "n"],
                         ):
-                            with patch("handlers.transfers.console"):
-                                with patch(
-                                    "handlers.transfers.auth_user",
-                                    return_value=mock_user,
-                                ):
-                                    transfers.add_transfer_items()
+                            with patch(
+                                "handlers.transfers.prompt", side_effect=["5", "y", "n"]
+                            ):
+                                with patch("handlers.transfers.console"):
+                                    with patch(
+                                        "handlers.transfers.auth_user",
+                                        return_value=mock_user,
+                                    ):
+                                        transfers.add_transfer_items()
 
-                                    execute_calls = mock_cursor.execute.call_args_list
-                                    sqls = [c[0][0] for c in execute_calls]
-                                    stock_idx = next(
-                                        i
-                                        for i, sql in enumerate(sqls)
-                                        if "inventory.stock" in sql
-                                        and "FOR UPDATE" in sql.upper()
-                                    )
-                                    ti_idx = next(
-                                        i
-                                        for i, sql in enumerate(sqls)
-                                        if "transfer_items" in sql
-                                        and "FOR UPDATE" in sql.upper()
-                                    )
-                                    assert stock_idx < ti_idx, (
-                                        "Stock FOR UPDATE must come before "
-                                        "transfer_items FOR UPDATE"
-                                    )
+                                        execute_calls = (
+                                            mock_cursor.execute.call_args_list
+                                        )
+                                        sqls = [c[0][0] for c in execute_calls]
+                                        stock_idx = next(
+                                            i
+                                            for i, sql in enumerate(sqls)
+                                            if "inventory.stock" in sql
+                                            and "FOR UPDATE" in sql.upper()
+                                        )
+                                        ti_idx = next(
+                                            i
+                                            for i, sql in enumerate(sqls)
+                                            if "transfer_items" in sql
+                                            and "FOR UPDATE" in sql.upper()
+                                        )
+                                        assert stock_idx < ti_idx, (
+                                            "Stock FOR UPDATE must come before "
+                                            "transfer_items FOR UPDATE"
+                                        )
 
 
 class TestRemoveTransferItemsNoRecursion:

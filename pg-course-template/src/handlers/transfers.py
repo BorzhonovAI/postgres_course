@@ -17,6 +17,29 @@ from validators import QuantityValidator, YesNoValidator
 from .warehouses import get_warehouse_full_address, get_warehouses
 
 
+def _get_route_pairs() -> dict[int, list[int]]:
+    """Возвращает маппинг: from_warehouse_id -> [to_warehouse_ids].
+
+    Для каждого склада, из которого есть хотя бы один маршрут,
+    перечисляет склады, в которые из него можно добраться.
+    """
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT w_from.id, w_to.id
+              FROM catalog.warehouses w_from
+              JOIN inventory.routes r ON r.from_city_id = w_from.city_id
+              JOIN catalog.warehouses w_to ON w_to.city_id = r.to_city_id
+            ORDER BY w_from.id, w_to.id
+            """)
+        rows = cur.fetchall()
+
+    mapping: dict[int, list[int]] = {}
+    for from_id, to_id in rows:
+        mapping.setdefault(from_id, []).append(to_id)
+    return mapping
+
+
 def _render_transfer_items(transfer: Transfer, items: list[dict[str, Any]]) -> None:
     """Рендерит таблицу items для одного transfer."""
     table = Table(
@@ -199,22 +222,46 @@ def add_transfer_items() -> None:
     """
     conn = get_conn()
 
+    # Маппинг: склад-отправление -> [склады-получатели, доступные по маршрутам]
+    route_pairs = _get_route_pairs()
+    if not route_pairs:
+        render_error("Нет маршрутов. Сначала добавьте маршруты.")
+        return
+
     warehouses = get_warehouses()
-    warehouses_options = [
+    warehouses_by_id = {w.id: w for w in warehouses}
+
+    from_warehouses = [
+        warehouses_by_id[wid] for wid in route_pairs if wid in warehouses_by_id
+    ]
+    from_warehouses_options = [
         (w.id, f"{get_warehouse_full_address(w.city_id)}, {w.address}")
-        for w in warehouses
+        for w in from_warehouses
     ]
 
     from_wh_id = prompt_choice(
         message="Выберите склад отправления:",
-        options=warehouses_options,
+        options=from_warehouses_options,
     )
 
-    to_warehouses = [w for w in warehouses if w.id != from_wh_id]
+    # Только те склады, в которые есть маршрут из выбранного отправления
+    to_wh_ids = route_pairs.get(from_wh_id, [])
+    to_warehouses = [
+        warehouses_by_id[wid]
+        for wid in to_wh_ids
+        if wid in warehouses_by_id and wid != from_wh_id
+    ]
     to_warehouses_options = [
         (w.id, f"{get_warehouse_full_address(w.city_id)}, {w.address}")
         for w in to_warehouses
     ]
+
+    if not to_warehouses:
+        render_error(
+            f"Из склада {get_warehouse_full_address(from_wh_id)} "
+            f"нет маршрутов никуда."
+        )
+        return
 
     to_wh_id = prompt_choice(
         message="Выберите склад получения:",
@@ -303,6 +350,21 @@ def add_transfer_items() -> None:
 
         # 3. Проверка стока + INSERT — короткая транзакция
         with conn.transaction():
+            # Блокируем трансфер и проверяем, что он всё ещё planned
+            with conn.cursor(row_factory=dict_row) as transfer_lock_cur:
+                transfer_lock_cur.execute(
+                    """SELECT status FROM inventory.transfers
+                       WHERE id = %s FOR UPDATE""",
+                    (transfer_id,),
+                )
+                transfer_row = transfer_lock_cur.fetchone()
+                if transfer_row is None or transfer_row["status"] != "planned":
+                    render_error(
+                        f"Трансфер #{transfer_id} уже не в статусе planned — "
+                        f"добавление невозможно."
+                    )
+                    continue
+
             # Блокируем строку stock — FOR UPDATE
             with conn.cursor(row_factory=dict_row) as check_cur:
                 check_cur.execute(
