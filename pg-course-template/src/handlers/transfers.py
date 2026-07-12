@@ -428,9 +428,7 @@ def add_transfer_items() -> None:
                 )
 
         except SerializationFailure:
-            render_error(
-                "Попытка одновременного изменения. Попробуйте ещё раз."
-            )
+            render_error("Попытка одновременного изменения. Попробуйте ещё раз.")
             continue
 
         # "Добавить ещё?" — ВНЕ транзакции
@@ -569,7 +567,19 @@ def remove_transfer_items() -> None:
 
         # 3. Блокировка и модификация — ВНУТРИ транзакции
         with conn.transaction():
-            # Блокируем строку transfer_items
+            # Сначала блокируем трансфер и проверяем статус
+            with conn.cursor() as transfer_lock_cur:
+                transfer_lock_cur.execute(
+                    """SELECT status FROM inventory.transfers
+                       WHERE id = %s FOR UPDATE""",
+                    (transfer_id,),
+                )
+                transfer_row = transfer_lock_cur.fetchone()
+                if transfer_row is None or transfer_row[0] != "planned":
+                    render_error(f"Трансфер #{transfer_id} уже не в статусе planned")
+                    return
+
+            # Потом блокируем строку transfer_items
             with conn.cursor() as lock_cur:
                 lock_cur.execute(
                     """SELECT id FROM inventory.transfer_items

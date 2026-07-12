@@ -529,9 +529,7 @@ class TestAddTransferItemsStockLock:
                                     ):
                                         transfers.add_transfer_items()
 
-                                        execute_calls = (
-                                            mock_db.execute.call_args_list
-                                        )
+                                        execute_calls = mock_db.execute.call_args_list
                                         sqls = [c[0][0] for c in execute_calls]
                                         update_idx = next(
                                             i
@@ -600,9 +598,11 @@ class TestRemoveTransferItemsNoRecursion:
             [transfer_item],
         ]
         # tx1: FOR UPDATE on transfers → (1,)
-        # tx2: FOR UPDATE transfer_items → 1, UPDATE RETURNING → (5,)
+        # tx2: FOR UPDATE transfers status → ('planned',), transfer_items lock → 1,
+        #      UPDATE RETURNING → (5,)
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (tx1)
+            ("planned",),  # FOR UPDATE transfers status check (tx2)
             1,  # transfer_items lock consume (tx2)
             (5,),  # UPDATE RETURNING quantity (tx2)
         ]
@@ -686,12 +686,15 @@ class TestRemoveTransferItemsNoRecursion:
             status="planned",
         )
 
-        # fetchone per iteration: FOR UPDATE on transfers, transfer_items lock, UPDATE RETURNING
+        # fetchone per iteration: FOR UPDATE on transfers, transfers status check,
+        # transfer_items lock, UPDATE RETURNING
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (1st iter)
+            ("planned",),  # transfers status check (1st iter)
             1,  # transfer_items lock consume (1st iter)
             (5,),  # UPDATE RETURNING (10 - 5 = 5, 1st iter)
             (1,),  # FOR UPDATE on transfers (2nd iter)
+            ("planned",),  # transfers status check (2nd iter)
             1,  # transfer_items lock consume (2nd iter)
             (10,),  # UPDATE RETURNING (20 - 10 = 10, 2nd iter)
         ]
@@ -784,11 +787,13 @@ class TestRemoveTransferItemsTransferItemsLock:
             [transfer],
             [item],
         ]
-        # fetchone: FOR UPDATE on transfers, transfer_items lock, UPDATE RETURNING
+        # fetchone: FOR UPDATE on transfers, transfers status check,
+        #           transfer_items lock, UPDATE RETURNING
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (inside tx)
-            1,  # transfer_items lock consume (inside tx)
-            (5,),  # UPDATE RETURNING (inside tx)
+            ("planned",),  # transfers status check (inside tx2)
+            1,  # transfer_items lock consume (inside tx2)
+            (5,),  # UPDATE RETURNING (inside tx2)
         ]
 
         with patch("db.get_conn", return_value=mock_db):
@@ -881,11 +886,13 @@ class TestRemoveTransferItemsTypeCoercion:
             [transfer],
             [item],
         ]
-        # fetchone: FOR UPDATE on transfers, transfer_items lock, UPDATE RETURNING
+        # fetchone: FOR UPDATE on transfers, transfers status check,
+        #           transfer_items lock, UPDATE RETURNING
         mock_cursor.fetchone.side_effect = [
             (1,),  # FOR UPDATE on transfers (inside tx)
-            1,  # transfer_items lock consume (inside tx)
-            (0,),  # UPDATE RETURNING quantity (0 = delete fully, inside tx)
+            ("planned",),  # transfers status check (inside tx2)
+            1,  # transfer_items lock consume (inside tx2)
+            (0,),  # UPDATE RETURNING quantity (0 = delete fully, inside tx2)
         ]
 
         with patch("db.get_conn", return_value=mock_db):
