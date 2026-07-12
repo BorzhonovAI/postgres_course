@@ -654,11 +654,19 @@ def start_shipping(transfer_id: str) -> None:
             )
             return
 
-        # Обновляем статус transfer
+        # Обновляем статус transfer — arriving_at = NOW() + duration маршрута
         conn.execute(
-            """UPDATE inventory.transfers
-               SET status = 'shipping', started_at = NOW(), arriving_at = NOW() + INTERVAL '1 day'
-               WHERE id = %s""",
+            """UPDATE inventory.transfers t
+               SET status = 'shipping',
+                   started_at = NOW(),
+                   arriving_at = NOW() + r.duration
+               FROM catalog.warehouses w_from
+               JOIN catalog.cities c_from ON c_from.id = w_from.city_id
+               JOIN catalog.warehouses w_to ON w_to.id = t.to_warehouse_id
+               JOIN catalog.cities c_to ON c_to.id = w_to.city_id
+               JOIN inventory.routes r ON r.from_city_id = c_from.id
+                                        AND r.to_city_id = c_to.id
+               WHERE t.id = %s""",
             (transfer_id,),
         )
 
