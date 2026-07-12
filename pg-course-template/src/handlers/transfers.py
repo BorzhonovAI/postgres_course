@@ -357,7 +357,7 @@ def add_transfer_items() -> None:
                 with conn.cursor(row_factory=dict_row) as transfer_lock_cur:
                     transfer_lock_cur.execute(
                         """SELECT status FROM inventory.transfers
-                           WHERE id = %s FOR UPDATE""",
+                           WHERE id = %s FOR SHARE""",
                         (transfer_id,),
                     )
                     transfer_row = transfer_lock_cur.fetchone()
