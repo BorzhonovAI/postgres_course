@@ -71,13 +71,14 @@ class TestShowOrder:
 
             with patch("handlers.orders._render_order"):
                 with patch("handlers.orders.get_product_by_id") as mock_prod:
-                    mock_prod.return_value = MagicMock(id=10, name="Тестовый товар", sku="SKU-001")
+                    mock_prod.return_value = MagicMock(
+                        id=10, name="Тестовый товар", sku="SKU-001"
+                    )
                     with patch("handlers.orders.console") as mock_console:
                         orders.show_order("1")
                         # console.print called once for the items table
                         # (_render_order is patched so doesn't print)
                         assert mock_console.print.call_count >= 1
-
 
 
 class TestEditOrder:
@@ -405,7 +406,9 @@ class TestAddOrder:
             mock_db.transaction = MagicMock(return_value=mock_tx)
 
             with patch("handlers.orders.get_warehouses") as mock_whs:
-                mock_whs.return_value = [Warehouse(id=1, address="x", city_id=1, label=None, is_central=True)]
+                mock_whs.return_value = [
+                    Warehouse(id=1, address="x", city_id=1, label=None, is_central=True)
+                ]
                 with patch("handlers.orders.get_city_name", return_value="City"):
                     with patch("handlers.orders.choice", return_value=1):
                         with patch("handlers.orders.auth_user") as mock_auth:
@@ -415,7 +418,9 @@ class TestAddOrder:
                                     orders.add_order()
 
                                     insert_calls = [
-                                        c for c in mock_db.execute.call_args_list if "INSERT" in c[0][0]
+                                        c
+                                        for c in mock_db.execute.call_args_list
+                                        if "INSERT" in c[0][0]
                                     ]
                                     assert len(insert_calls) >= 1
                                     # The SQL string must contain created_by_id
@@ -442,8 +447,12 @@ class TestAddOrder:
                 with patch("handlers.orders.get_city_name", return_value="City"):
                     with patch("handlers.orders.choice", return_value=1):
                         with patch("handlers.orders.auth_user", return_value=mock_user):
-                            with patch("handlers.orders.prompt", side_effect=["y", "n"]):
-                                with patch("handlers.orders.add_order_item") as mock_add_item:
+                            with patch(
+                                "handlers.orders.prompt", side_effect=["y", "n"]
+                            ):
+                                with patch(
+                                    "handlers.orders.add_order_item"
+                                ) as mock_add_item:
                                     with patch("handlers.orders.show_order"):
                                         orders.add_order()
 
@@ -457,6 +466,7 @@ class TestAddOrder:
                                             if "INSERT" in c[0][0]
                                         ]
                                         assert len(insert_calls) >= 1
+
     """list_orders() fetches and renders all orders."""
 
     def test_renders_orders_table(self, mock_db, mock_user):
@@ -560,9 +570,7 @@ class TestListOrdersNew:
             with patch("handlers.orders.console"):
                 orders.list_orders_new()
 
-                select_calls = [
-                    c for c in mock_db.cursor.call_args_list
-                ]
+                select_calls = [c for c in mock_db.cursor.call_args_list]
                 assert len(select_calls) >= 1
                 # verify cursor.execute was called with status filter
                 execute_calls = mock_cursor.execute.call_args_list
@@ -583,9 +591,7 @@ class TestListOrdersNew:
                 # console.print was called at least once (empty message)
                 assert mock_console.print.called
                 # verify it printed a yellow message (empty)
-                print_args = [
-                    c[0] for c in mock_console.print.call_args_list
-                ]
+                print_args = [c[0] for c in mock_console.print.call_args_list]
                 # should have printed "[yellow]Нет заказов со статусом new[/yellow]"
                 found = any(
                     isinstance(a, str) and "Нет заказов" in a
@@ -690,15 +696,23 @@ class TestListOrdersProcessing:
                 "handlers.orders.get_warehouse_full_address", return_value="ул. Тест, 1"
             ):
                 with patch("handlers.orders.get_user") as mock_get_user:
-                    mock_get_user.side_effect = lambda uid: mock_user if uid == 1 else proc_user
+                    mock_get_user.side_effect = lambda uid: (
+                        mock_user if uid == 1 else proc_user
+                    )
                     with patch("handlers.orders.console") as mock_console:
                         orders.list_orders_processing()
                         # console.print was called; verify it includes processor name
                         print_args = [c[0] for c in mock_console.print.call_args_list]
                         # the Table object was printed — it should contain "inventory_mgr"
-                        table_arg = print_args[0][0] if isinstance(print_args[0], tuple) else print_args[0]
+                        table_arg = (
+                            print_args[0][0]
+                            if isinstance(print_args[0], tuple)
+                            else print_args[0]
+                        )
                         # rich Table doesn't have __str__ that we can assert on, so just verify get_user was called for processor
-                        assert mock_get_user.call_count >= 2  # once for created_by, once for processing_by
+                        assert (
+                            mock_get_user.call_count >= 2
+                        )  # once for created_by, once for processing_by
 
 
 # ─── list orders my ───────────────────────────────────────────────────
@@ -779,7 +793,9 @@ class TestListOrdersMy:
             from handlers import orders  # noqa: F811
 
             with patch("handlers.orders.console"):
-                with patch("handlers.orders.auth_user", return_value=mock_user) as mock_auth:
+                with patch(
+                    "handlers.orders.auth_user", return_value=mock_user
+                ) as mock_auth:
                     orders.list_orders_my()
                     mock_auth.assert_called_once()
 
@@ -795,8 +811,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=1, status="new", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=1,
+            status="new",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=1, product_id=10, quantity=2, price=Decimal("50"))
 
@@ -804,6 +824,7 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "ожидает обработки"
 
@@ -812,8 +833,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=2, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=2,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=2, product_id=10, quantity=5, price=Decimal("20"))
 
@@ -824,6 +849,7 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "ожидает обработки"
 
@@ -832,17 +858,24 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=3, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=3,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=3, product_id=10, quantity=3, price=Decimal("20"))
 
         mock_cursor = mock_db.cursor.return_value
         # reserve has quantity=5 which is >= 3
-        mock_cursor.fetchone.side_effect = [(5,),]
+        mock_cursor.fetchone.side_effect = [
+            (5,),
+        ]
 
         with patch("db.get_conn", return_value=mock_db):
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "в резерве"
 
@@ -852,8 +885,12 @@ class TestGetItemStatus:
         from datetime import timedelta
 
         order = Order(
-            id=4, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=2, created_by_id=1,
+            id=4,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=2,
+            created_by_id=1,
         )
         item = OrderItem(order_id=4, product_id=10, quantity=3, price=Decimal("20"))
 
@@ -864,9 +901,11 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             import sys
+
             for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
                 del sys.modules[mod]
             from handlers import orders as orders2  # noqa: F811
+
             status = orders2._get_item_status(order, item)
             assert "в пути" in status
             assert "из склада #1" in status
@@ -876,8 +915,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=5, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=2, created_by_id=1,
+            id=5,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=2,
+            created_by_id=1,
         )
         item = OrderItem(order_id=5, product_id=10, quantity=3, price=Decimal("20"))
 
@@ -886,9 +929,11 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             import sys
+
             for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
                 del sys.modules[mod]
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert "в пути" in status
             assert "из склада #1" in status
@@ -899,8 +944,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=6, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=6,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=6, product_id=10, quantity=3, price=Decimal("20"))
 
@@ -909,9 +958,11 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             import sys
+
             for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
                 del sys.modules[mod]
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "отгружено"
 
@@ -920,8 +971,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=7, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=7,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=7, product_id=10, quantity=3, price=Decimal("20"))
 
@@ -930,9 +985,11 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             import sys
+
             for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
                 del sys.modules[mod]
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "запланирована отгрузка"
 
@@ -941,8 +998,12 @@ class TestGetItemStatus:
         from handlers.structures import Order, OrderItem
 
         order = Order(
-            id=8, status="processing", total_amount=Decimal("100"),
-            created_at=datetime.now(), warehouse_id=1, created_by_id=1,
+            id=8,
+            status="processing",
+            total_amount=Decimal("100"),
+            created_at=datetime.now(),
+            warehouse_id=1,
+            created_by_id=1,
         )
         item = OrderItem(order_id=8, product_id=10, quantity=3, price=Decimal("20"))
 
@@ -951,9 +1012,11 @@ class TestGetItemStatus:
 
         with patch("db.get_conn", return_value=mock_db):
             import sys
+
             for mod in [m for m in sys.modules if m.startswith("handlers.orders")]:
                 del sys.modules[mod]
             from handlers import orders  # noqa: F811
+
             status = orders._get_item_status(order, item)
             assert status == "ожидает обработки"
 
@@ -997,7 +1060,10 @@ class TestMarkOrderProcessing:
             with patch("handlers.orders.render_error") as mock_error:
                 orders.mark_order_processing("1")
                 mock_error.assert_called_once()
-                assert "уже в обработке" in mock_error.call_args[0][0] or "статус" in mock_error.call_args[0][0]
+                assert (
+                    "уже в обработке" in mock_error.call_args[0][0]
+                    or "статус" in mock_error.call_args[0][0]
+                )
 
     def test_shows_order_and_prompts_confirmation(self, mock_db, mock_user):
         from handlers.structures import Order
@@ -1083,7 +1149,8 @@ class TestMarkOrderProcessing:
                             orders.mark_order_processing("7")
 
                             update_calls = [
-                                c for c in mock_db.execute.call_args_list
+                                c
+                                for c in mock_db.execute.call_args_list
                                 if "UPDATE" in c[0][0]
                             ]
                             assert len(update_calls) >= 1

@@ -3,6 +3,12 @@
 ALTER TABLE sales.orders DROP CONSTRAINT orders_processing_by_fk;
 ALTER TABLE sales.orders DROP COLUMN processing_by;
 
+-- undo: partial unique indexes
+
+DROP INDEX IF EXISTS transfer_items_uniq_not_null_reserve;
+DROP INDEX IF EXISTS transfer_items_uniq_null_reserve;
+DROP INDEX IF EXISTS transfers_single_planned_per_route;
+
 -- undo: missing inventory tables
 
 DROP TABLE inventory.transfer_items;
